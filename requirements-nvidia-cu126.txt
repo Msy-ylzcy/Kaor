@@ -2,7 +2,6 @@
 # Torch is installed separately from PyTorch's official cu126 index by the
 # build script so a machine-wide CPU mirror cannot silently replace it.
 -r requirements-runtime-common.txt
-paddlepaddle-gpu @ https://paddle-whl.bj.bcebos.com/stable/cu126/paddlepaddle-gpu/paddlepaddle_gpu-3.3.1-cp312-cp312-win_amd64.whl
 nvidia-cuda-runtime-cu12==12.6.77
 # Paddle's cu126 wheel metadata requests 9.5.1.17, but the loaded binary reports
 # it was compiled against cuDNN 9.9. Use the binary-compatible version; OCR and

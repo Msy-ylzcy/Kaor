@@ -29,3 +29,17 @@ def test_portable_build_keeps_all_uvr_model_assets_on_demand():
     assert '"models\\uvr\\$uvrModelName",' not in build_script
     assert 'foreach ($assetName in @($uvrModelName, $uvrConfigName))' in build_script
     assert "assets must be downloaded on first use, not redistributed" in build_script
+
+
+def test_nvidia_build_installs_paddle_wheel_without_conflicting_metadata():
+    build_script = (ROOT / "scripts" / "build-portable.ps1").read_text(
+        encoding="utf-8"
+    )
+    requirements = (ROOT / "requirements-nvidia-cu126.txt").read_text(
+        encoding="utf-8"
+    )
+
+    assert '"--no-deps",' in build_script
+    assert "$paddleGpuWheel" in build_script
+    assert "paddlepaddle-gpu @" not in requirements
+    assert "nvidia-cudnn-cu12==9.9.0.52" in requirements

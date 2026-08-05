@@ -97,7 +97,9 @@ checkpoint 从 `TRvlvr/model_repo` 的 `all_public_uvr_models` Release 获取，
 
 Torch 系列索引始终由脚本显式指定：CPU/AMD 使用清华 PyPI 镜像安装无 CUDA
 后缀的 Torch、TorchAudio 和 TorchVision，NVIDIA 使用 PyTorch 官方
-`/whl/cu126` 安装三者的匹配版本。随后运行时检查 `torch.version.cuda`：CPU/AMD
+`/whl/cu126` 安装三者的匹配版本。NVIDIA 的 Paddle CUDA wheel 使用 `--no-deps`
+安装，再由档位清单明确安装二进制实际需要的 cuDNN 9.9，避开 wheel 元数据中
+错误的 cuDNN 9.5 依赖。随后运行时检查 `torch.version.cuda`：CPU/AMD
 必须为空，NVIDIA 必须存在，并实际加载 TorchVision 原生算子，避免镜像解析错包。
 
 常用开关：

@@ -33,6 +33,7 @@ $ErrorActionPreference = "Stop"
 $torchVersion = "2.11.0"
 $torchAudioVersion = "2.11.0"
 $torchVisionVersion = "0.26.0"
+$paddleGpuWheel = "https://paddle-whl.bj.bcebos.com/stable/cu126/paddlepaddle-gpu/paddlepaddle_gpu-3.3.1-cp312-cp312-win_amd64.whl"
 $githubReleaseAssetLimit = 2GB
 $uvrModelName = "model_bs_roformer_ep_317_sdr_12.9755.ckpt"
 $uvrConfigName = "model_bs_roformer_ep_317_sdr_12.9755.yaml"
@@ -242,6 +243,15 @@ if (-not $SkipInstall) {
         "torchaudio==$torchAudioVersion$torchSuffix",
         "torchvision==$torchVisionVersion$torchSuffix"
     )
+    if ($RuntimeProfile -eq "nvidia-cu126") {
+        # Paddle's wheel metadata pins cuDNN 9.5 although the loaded binary reports
+        # cuDNN 9.9. Install the wheel without dependencies, then let the pinned
+        # profile install the binary-compatible CUDA libraries explicitly.
+        Invoke-External -FilePath $venvPython -Arguments @(
+            "-m", "pip", "install", "--disable-pip-version-check", "--no-deps",
+            $paddleGpuWheel
+        )
+    }
     Invoke-External -FilePath $venvPython -Arguments @(
         "-m", "pip", "install", "--disable-pip-version-check", "-r", $requirementsPath
     )
