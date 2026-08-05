@@ -15,6 +15,7 @@ from .audio_pipeline import (
     UVR_CONFIG_FILENAME,
     UVR_MODEL_FILENAME,
     ensure_uvr_checkpoint,
+    ensure_uvr_config,
     resolve_uvr_assets,
 )
 from .diarization import SPEAKER_COLORS, diarize_cues
@@ -62,9 +63,16 @@ def separate_vocals(
             "audio-separator is required for local BS-Roformer vocal separation"
         ) from exc
 
+    ensure_uvr_config(
+        progress=(
+            (lambda value, message: progress(0.01 + value * 0.01, message))
+            if progress
+            else None
+        )
+    )
     ensure_uvr_checkpoint(
         progress=(
-            (lambda value, message: progress(0.01 + value * 0.34, message))
+            (lambda value, message: progress(0.02 + value * 0.33, message))
             if progress
             else None
         )

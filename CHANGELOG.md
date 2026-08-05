@@ -15,7 +15,7 @@ Kaor 0.2.0 is the first public Windows desktop release.
 
 ### Runtime downloads
 
-- Public archives exclude the BS-Roformer checkpoint because its upstream page does not state redistribution terms. The first UVR task downloads the pinned 639,331,213-byte file directly from its original GitHub Release, supports resume, verifies SHA-256, and then reuses the local copy.
+- Public archives exclude the BS-Roformer YAML and checkpoint because their upstream pages do not state redistribution terms. The first UVR task downloads both from pinned upstream locations, verifies size and SHA-256, supports checkpoint resume, and then reuses the local copies.
 - Language-specific ASR, optional NeMo diarization, and local translation models are downloaded only when selected.
 
 ### Hardware profiles

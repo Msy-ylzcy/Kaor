@@ -26,13 +26,13 @@ Windows 下 AMD profile 不把 CUDA wheel 伪装成 AMD wheel。OCR、UVR、ASR 
   共用一个 PyInstaller `COLLECT` 目录中的 DLL 和 Python 模块。
 - `bin/ffmpeg.exe`：固定的 FFmpeg 可执行文件。
 - `models/paddlex/`：离线 OCR 检测和识别模型。
-- `models/uvr/`：固定 BS-Roformer YAML；checkpoint 不进入公开发行包。
+- `models/uvr/`：运行时按需创建；BS-Roformer YAML 与 checkpoint 都不进入公开发行包。
 - `models/diarization/`：默认不进入发行包；仅在两个完整 NeMo 说话人模型均存在、已核对再分发条款，并显式传入 `-BundleDiarizationModels` 时才携带。否则首次需要聚类时由程序管理下载。
 - `fonts/`、`docs/`、许可证和第三方通知。
 - `RELEASE.json`、`AUDIO-RUNTIME-PROBE.json`、`DEPENDENCIES-PYTHON.txt` 和
   `SHA256SUMS.txt`。
 
-BS-Roformer checkpoint、语言专用 ASR checkpoint、本地翻译 GGUF，以及构建输入未
+BS-Roformer YAML 与 checkpoint、语言专用 ASR checkpoint、本地翻译 GGUF，以及构建输入未
 提供时的 NeMo 说话人模型由程序按需下载，不把授权边界不清晰或非必选的数 GB
 模型重复塞进三个发行包。下载后仍在本机推理，不需要安装 Python。
 
@@ -67,37 +67,23 @@ portable 目录同时携带该机器清单、`licenses/APACHE-2.0.txt`、模型�
 `README.md` 和 `licenses/PP-OCRV6-MODEL-NOTICE.txt`。本地维护者构建使用相同目录
 布局；缺少 detector 或 recognizer 文件时不会临时联网补齐。
 
-## 固定的 UVR 配置与首次下载
+## UVR 模型资产首次下载
 
-本机构建只读取并打包固定 YAML。仓库工作区中的配置目录由 `.gitignore` 排除：
+公开 portable 包不打包下面两项上游模型资产，并在归档前显式检查它们不存在：
 
 ```text
 models\uvr\model_bs_roformer_ep_317_sdr_12.9755.yaml
-```
-
-配置缺失时，维护者可用 `-UvrRoot` 指向包含以下布局的构建输入：
-
-```text
-models\MDX_Net_Models\model_data\mdx_c_configs\model_bs_roformer_ep_317_sdr_12.9755.yaml
-```
-
-YAML 的 SHA-256 必须是：
-
-```text
-2bfdd16c656bd9519aba757cc4f8834b7ede675eb1e00ec4772d74ae1c41af7f
-```
-
-公开 portable 包会显式检查下面的权重不存在：
-
-```text
 models\uvr\model_bs_roformer_ep_317_sdr_12.9755.ckpt
 ```
 
-配置缺失或哈希不符会中止构建；检测到目标 checkpoint 被写入 portable 目录也会
-中止。用户第一次启动 UVR 阶段时，Kaor 从通知文件记录的固定上游地址下载
-checkpoint 到 `models/uvr/`，以 `.ckpt.part` 临时文件断点续传，完成后核对固定
-字节数和 SHA-256 再原子改名。运行时仍只读取程序目录的 `models/uvr/`，不扫描
-目标机器上的外部 UVR5 路径。
+用户第一次启动 UVR 阶段时，Kaor 下载匹配 YAML 与 checkpoint 到 `models/uvr/`。
+YAML 固定到 `TRvlvr/application_data` 提交
+`22b79fc01ada8f3b9e3526ad0ed645af414a7cde`，核对 `2273` 字节及 SHA-256
+`2bfdd16c656bd9519aba757cc4f8834b7ede675eb1e00ec4772d74ae1c41af7f`。
+checkpoint 从 `TRvlvr/model_repo` 的 `all_public_uvr_models` Release 获取，以
+`.ckpt.part` 临时文件断点续传，完成后核对 `639331213` 字节及 SHA-256
+`5b84f37e8d444c8cb30c79d77f613a41c05868ff9c9ac6c7049c00aefae115aa` 再原子改名。
+运行时只读取程序目录的 `models/uvr/`，不扫描目标机器上的外部 UVR5 路径。
 
 ## 本机构建命令
 
@@ -171,7 +157,7 @@ artifacts/releases/Kaor-Windows-x64-NVIDIA-Setup.cs
 Framework C# 编译器时直接失败，不下载或使用不可审计的第三方解包程序。
 
 脚本会依次检查 Python 版本、Torch/Paddle 运行时、前端产物、后端测试、两个
-PyInstaller EXE、OCR 模型、UVR 配置和 checkpoint 排除策略、严格音频 worker probe、包内逐文件 SHA-256 以及
+PyInstaller EXE、OCR 模型、UVR YAML/checkpoint 排除策略、严格音频 worker probe、包内逐文件 SHA-256 以及
 完整 ZIP SHA-256。CPU/AMD 单 ZIP 超过 GitHub 单个 asset 的 2 GiB 时仍默认失败；
 NVIDIA 无论整包是否刚好低于该上限都进入上述分片流程，并强制至少两片、每片
 小于 2 GiB，从而让 Release 和安装方式保持唯一且稳定。

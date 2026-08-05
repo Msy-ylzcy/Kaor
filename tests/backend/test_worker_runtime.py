@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import sys
 from pathlib import Path
 
@@ -42,6 +43,12 @@ def test_uvr_assets_prefer_portable_direct_layout(monkeypatch, tmp_path):
     model.write_bytes(b"x" * 32)
     config.write_text("audio: {}\n", encoding="utf-8")
     monkeypatch.setattr(audio_pipeline, "UVR_EXPECTED_SIZE", 32)
+    monkeypatch.setattr(audio_pipeline, "UVR_CONFIG_EXPECTED_SIZE", config.stat().st_size)
+    monkeypatch.setattr(
+        audio_pipeline,
+        "UVR_CONFIG_EXPECTED_SHA256",
+        hashlib.sha256(config.read_bytes()).hexdigest(),
+    )
 
     resolved_model, resolved_config, error = audio_pipeline.resolve_uvr_assets(tmp_path)
 

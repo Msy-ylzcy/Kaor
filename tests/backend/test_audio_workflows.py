@@ -245,6 +245,30 @@ def test_uvr_checkpoint_download_resumes_and_installs_atomically(tmp_path, monke
     assert events[-1] == (1.0, "BS-Roformer checkpoint downloaded and verified")
 
 
+def test_uvr_config_download_uses_pinned_source_and_installs_atomically(
+    tmp_path, monkeypatch
+):
+    payload = b"audio: {}\n"
+    monkeypatch.setattr(audio_pipeline, "UVR_CONFIG_EXPECTED_SIZE", len(payload))
+    monkeypatch.setattr(
+        audio_pipeline,
+        "UVR_CONFIG_EXPECTED_SHA256",
+        hashlib.sha256(payload).hexdigest(),
+    )
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert str(request.url) == audio_pipeline.UVR_CONFIG_URL
+        return httpx.Response(200, content=payload)
+
+    installed = audio_pipeline.ensure_uvr_config(
+        tmp_path, transport=httpx.MockTransport(handler)
+    )
+
+    assert installed == (tmp_path / audio_pipeline.UVR_CONFIG_FILENAME).resolve()
+    assert installed.read_bytes() == payload
+    assert not installed.with_suffix(installed.suffix + ".part").exists()
+
+
 def test_uvr_checkpoint_hash_failure_does_not_replace_existing_file(
     tmp_path, monkeypatch
 ):
@@ -332,6 +356,9 @@ def test_speech_pipeline_separation_adapter_uses_local_assets(tmp_path, monkeypa
     )
     monkeypatch.setattr(
         speech_pipeline, "ensure_uvr_checkpoint", lambda **_kwargs: model_path
+    )
+    monkeypatch.setattr(
+        speech_pipeline, "ensure_uvr_config", lambda **_kwargs: config_path
     )
     monkeypatch.setattr(speech_pipeline, "_resolve_device", lambda _value: "cuda:0")
 

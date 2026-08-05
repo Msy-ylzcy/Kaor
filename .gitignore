@@ -41,6 +41,7 @@ artifacts/
 build/
 dist/
 .build/
+docs/TUTORIAL_RECORDING.zh-CN.md
 Microsoft/Windows/PowerShell/ModuleAnalysisCache
 *.zip
 *.sha256

@@ -1,21 +1,20 @@
 BS-Roformer model artifact notice
 ================================
 
-Managed-download filename:
+Managed-download checkpoint filename:
   model_bs_roformer_ep_317_sdr_12.9755.ckpt
+
+Managed-download configuration filename:
+  model_bs_roformer_ep_317_sdr_12.9755.yaml
 
 Model author attribution used by the upstream catalog:
   viperx
 
-Upstream distribution location used by Kaor's first-use downloader:
+Checkpoint distribution location used by Kaor's first-use downloader:
   https://github.com/TRvlvr/model_repo/releases/download/all_public_uvr_models/model_bs_roformer_ep_317_sdr_12.9755.ckpt
 
 Configuration source:
-  https://github.com/ZFTurbo/Music-Source-Separation-Training/blob/main/configs/viperx/model_bs_roformer_ep_317_sdr_12.9755.yaml
-
-Configuration source repository license:
-  MIT License, copyright (c) 2024 Roman Solovyev (ZFTurbo)
-  Retained in licenses/ZFTURBO-MSS-MIT.txt
+  https://raw.githubusercontent.com/TRvlvr/application_data/22b79fc01ada8f3b9e3526ad0ed645af414a7cde/mdx_model_data/mdx_c_configs/model_bs_roformer_ep_317_sdr_12.9755.yaml
 
 Checkpoint size:
   639331213 bytes
@@ -26,25 +25,23 @@ Checkpoint SHA-256:
 Configuration SHA-256:
   2bfdd16c656bd9519aba757cc4f8834b7ede675eb1e00ec4772d74ae1c41af7f
 
+Configuration size:
+  2273 bytes
+
 License audit performed: 2026-08-05
 
-The configuration source repository publishes an MIT License, and no
-file-specific exception was found for the referenced YAML. Kaor therefore
-retains that repository license text with the YAML and its attribution.
-
-No LICENSE file was present in the TRvlvr/model_repo repository, and no
-checkpoint-specific license or redistribution terms were stated on its
-all_public_uvr_models Release page when checked. Public availability does not
-by itself state permission to repackage the checkpoint. The ZFTurbo MIT License
-must not be applied to the separately distributed checkpoint merely because the
-checkpoint uses that YAML.
+No LICENSE file was present in the TRvlvr/model_repo or TRvlvr/application_data
+repository, and no file-specific redistribution terms were stated on the
+checkpoint Release page or configuration repository when checked. Public
+availability does not by itself state permission to repackage either file.
 
 The Kaor MIT License covers Kaor source code and does not relicense this model
-artifact. Kaor's public portable archives do not contain the checkpoint. When
-the user first starts the UVR stage, Kaor downloads the file directly from the
-upstream location above, verifies the recorded size and SHA-256, and stores it
-in the user's extracted Kaor directory. Any future release that embeds the
-checkpoint would require an explicit redistribution grant from the model
-rightsholder/distributor, or a replacement model whose published terms permit
-the intended redistribution. This notice records provenance and the unresolved
-license status; it is not a license grant.
+artifacts. Kaor's public portable archives contain neither the checkpoint nor
+the configuration. When the user first starts the UVR stage, Kaor downloads
+both files directly from the fixed upstream locations above, verifies each
+recorded size and SHA-256, and stores them in the user's extracted Kaor
+directory. Any future release that embeds either file would require an explicit
+redistribution grant from the applicable rightsholder/distributor, or
+replacement assets whose published terms permit the intended redistribution.
+This notice records provenance and the unresolved license status; it is not a
+license grant.

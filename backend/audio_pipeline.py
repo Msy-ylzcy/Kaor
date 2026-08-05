@@ -144,9 +144,18 @@ UVR_MODEL_FILENAME = "model_bs_roformer_ep_317_sdr_12.9755.ckpt"
 UVR_CONFIG_FILENAME = "model_bs_roformer_ep_317_sdr_12.9755.yaml"
 UVR_EXPECTED_SIZE = 639_331_213
 UVR_EXPECTED_SHA256 = "5b84f37e8d444c8cb30c79d77f613a41c05868ff9c9ac6c7049c00aefae115aa"
+UVR_CONFIG_EXPECTED_SIZE = 2_273
+UVR_CONFIG_EXPECTED_SHA256 = (
+    "2bfdd16c656bd9519aba757cc4f8834b7ede675eb1e00ec4772d74ae1c41af7f"
+)
 UVR_MODEL_URL = (
     "https://github.com/TRvlvr/model_repo/releases/download/"
     "all_public_uvr_models/model_bs_roformer_ep_317_sdr_12.9755.ckpt"
+)
+UVR_CONFIG_URL = (
+    "https://raw.githubusercontent.com/TRvlvr/application_data/"
+    "22b79fc01ada8f3b9e3526ad0ed645af414a7cde/mdx_model_data/"
+    "mdx_c_configs/model_bs_roformer_ep_317_sdr_12.9755.yaml"
 )
 
 
@@ -289,6 +298,102 @@ def _uvr_download_lock(
         handle.close()
 
 
+def ensure_uvr_config(
+    root: Path | None = None,
+    *,
+    progress: Callable[[float, str], None] | None = None,
+    cancel_event: Event | None = None,
+    transport: httpx.BaseTransport | None = None,
+) -> Path:
+    """Install the pinned UVR configuration from its upstream repository."""
+
+    destination = uvr_asset_roots(root)[0] / UVR_CONFIG_FILENAME
+    partial = destination.with_suffix(destination.suffix + ".part")
+    lock_path = destination.with_suffix(destination.suffix + ".download.lock")
+
+    def report(value: float, message: str) -> None:
+        if progress:
+            progress(max(0.0, min(1.0, value)), message)
+
+    try:
+        with _uvr_download_lock(lock_path, cancel_event):
+            if destination.is_file() and destination.stat().st_size == UVR_CONFIG_EXPECTED_SIZE:
+                actual = _hash_file(destination, cancel_event=cancel_event)
+                if actual == UVR_CONFIG_EXPECTED_SHA256.lower():
+                    report(1.0, "BS-Roformer configuration is ready")
+                    return destination.resolve()
+                logger.warning(
+                    "existing UVR configuration failed SHA-256 validation path=%s actual=%s",
+                    destination,
+                    actual,
+                )
+
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            partial.unlink(missing_ok=True)
+            report(0.0, "Downloading the pinned BS-Roformer configuration")
+            headers = {
+                "Accept": "application/octet-stream",
+                "Accept-Encoding": "identity",
+                "User-Agent": "Kaor/0.2.0",
+            }
+            with httpx.Client(
+                transport=transport,
+                follow_redirects=True,
+                timeout=httpx.Timeout(60.0, connect=30.0),
+                trust_env=True,
+            ) as client:
+                with client.stream("GET", UVR_CONFIG_URL, headers=headers) as response:
+                    response.raise_for_status()
+                    if response.status_code != 200:
+                        raise AudioPipelineError(
+                            "official BS-Roformer configuration returned unexpected HTTP "
+                            f"{response.status_code}"
+                        )
+                    completed = 0
+                    with partial.open("wb") as handle:
+                        for chunk in response.iter_bytes(chunk_size=64 * 1024):
+                            if cancel_event is not None and cancel_event.is_set():
+                                raise InterruptedError("job cancelled")
+                            if not chunk:
+                                continue
+                            handle.write(chunk)
+                            completed += len(chunk)
+                            if completed > UVR_CONFIG_EXPECTED_SIZE:
+                                raise AudioPipelineError(
+                                    "official BS-Roformer configuration exceeded the pinned "
+                                    f"size of {UVR_CONFIG_EXPECTED_SIZE} bytes"
+                                )
+                        handle.flush()
+                        os.fsync(handle.fileno())
+
+            actual_size = partial.stat().st_size if partial.is_file() else 0
+            if actual_size != UVR_CONFIG_EXPECTED_SIZE:
+                raise AudioPipelineError(
+                    "BS-Roformer configuration download is incomplete: expected "
+                    f"{UVR_CONFIG_EXPECTED_SIZE} bytes, received {actual_size}"
+                )
+            actual_sha256 = _hash_file(partial, cancel_event=cancel_event)
+            if actual_sha256 != UVR_CONFIG_EXPECTED_SHA256.lower():
+                partial.unlink(missing_ok=True)
+                raise AudioPipelineError(
+                    "BS-Roformer configuration SHA-256 mismatch: expected "
+                    f"{UVR_CONFIG_EXPECTED_SHA256}, received {actual_sha256}"
+                )
+            os.replace(partial, destination)
+            report(1.0, "BS-Roformer configuration downloaded and verified")
+            logger.info("installed pinned UVR configuration at %s", destination)
+            return destination.resolve()
+    except InterruptedError:
+        raise
+    except AudioPipelineError:
+        raise
+    except (httpx.HTTPError, OSError) as exc:
+        raise AudioPipelineError(
+            "BS-Roformer configuration download failed from the fixed upstream: "
+            f"{exc}. Retry UVR to download a clean copy"
+        ) from exc
+
+
 def ensure_uvr_checkpoint(
     root: Path | None = None,
     *,
@@ -298,10 +403,9 @@ def ensure_uvr_checkpoint(
 ) -> Path:
     """Install the pinned UVR checkpoint on first use.
 
-    The public portable package carries the matching YAML, while this function
-    obtains the large checkpoint from its fixed upstream release. A completed
-    download is never made visible at the runtime path until both its byte size
-    and SHA-256 match the pinned values.
+    The public portable package does not redistribute the checkpoint. A
+    completed download is never made visible at the runtime path until both its
+    byte size and SHA-256 match the pinned values.
     """
 
     destination = uvr_asset_roots(root)[0] / UVR_MODEL_FILENAME
@@ -511,12 +615,16 @@ def resolve_uvr_assets(root: Path | None = None) -> tuple[Path | None, Path | No
             continue
         if model.stat().st_size != UVR_EXPECTED_SIZE:
             return None, None, f"UVR model size mismatch: {model}"
+        if config.stat().st_size != UVR_CONFIG_EXPECTED_SIZE:
+            return None, None, f"UVR configuration size mismatch: {config}"
+        if _hash_file(config) != UVR_CONFIG_EXPECTED_SHA256.lower():
+            return None, None, f"UVR configuration SHA-256 mismatch: {config}"
         return model.resolve(), config.resolve(), None
     return (
         None,
         None,
-        "BS-Roformer checkpoint is missing or incomplete; start UVR to download "
-        "and verify it from the fixed upstream: "
+        "BS-Roformer assets are missing or incomplete; start UVR to download "
+        "and verify them from their fixed upstream locations: "
         + "; ".join(checked),
     )
 

@@ -27,7 +27,7 @@ WebUI 日志页可按来源、级别和关键词筛选，点击日志行展开�
 | `PaddleOCR is not installed` / `No module named 'paddle'` | OCR 运行时缺失，重新完整解压对应版本并检查安全软件隔离区 |
 | `CUDA was requested` / `no kernel image` / `cudnn` | 驱动或 CUDA 发行包不匹配 |
 | `out of memory` / `failed to allocate` | 降低 OCR/ASR 批量、本地模型或上下文 |
-| `UVR model download failed` / `UVR model size mismatch` / `SHA-256 mismatch` | BS-Roformer 首次下载失败、不完整或被代理替换 |
+| `BS-Roformer configuration download failed` / `BS-Roformer checkpoint download failed` / `UVR model size mismatch` / `SHA-256 mismatch` | BS-Roformer 首次下载失败、不完整或被代理替换 |
 | `KaorAudioWorker.exe` / `worker exited without a result` | 音频 Worker 缺失、被拦截或崩溃 |
 | `PyTorch is required` / `No module named 'torch'` / `audio-separator is required` / `nemo` / `funasr` | 音频推理模块缺失或发行包目录被混用 |
 | `ffmpeg was not found` / `Invalid data found` | FFmpeg 或片源异常 |
@@ -150,18 +150,19 @@ models\uvr\model_bs_roformer_ep_317_sdr_12.9755.ckpt
 models\uvr\model_bs_roformer_ep_317_sdr_12.9755.yaml
 ```
 
-程序不读取外部 UVR5 路径。YAML 随包提供；checkpoint 在第一次运行 UVR 阶段时直接从上游原发布页断点下载，必须为 `639331213` 字节，SHA-256 为 `5b84f37e8d444c8cb30c79d77f613a41c05868ff9c9ac6c7049c00aefae115aa`。
+程序不读取外部 UVR5 路径。YAML 与 checkpoint 在第一次运行 UVR 阶段时从各自固定上游地址下载。YAML 必须为 `2273` 字节，SHA-256 为 `2bfdd16c656bd9519aba757cc4f8834b7ede675eb1e00ec4772d74ae1c41af7f`；checkpoint 支持断点续传，必须为 `639331213` 字节，SHA-256 为 `5b84f37e8d444c8cb30c79d77f613a41c05868ff9c9ac6c7049c00aefae115aa`。
 
 常见错误：
 
-- `UVR model download failed`：检查 VPN、代理、防火墙和 GitHub Release 可访问性，然后重新点 UVR；已有 `.part` 会续传。
+- `BS-Roformer configuration download failed`：检查代理、防火墙和 `raw.githubusercontent.com` 可访问性，然后重新点 UVR。
+- `BS-Roformer checkpoint download failed`：检查代理、防火墙和 GitHub Release 可访问性，然后重新点 UVR；已有 `.ckpt.part` 会续传。
 - `UVR model not found`：下载尚未完成，或程序目录不可写；把整包解压到普通可写目录。
 - `UVR model size mismatch` / `SHA-256 mismatch`：删除对应 `.part` 和错误的 checkpoint 后重试，避免代理返回 HTML 错误页。
-- `UVR model config not found`：缺少对应 YAML。
+- `UVR configuration size mismatch` / `UVR configuration SHA-256 mismatch`：YAML 不完整或被替换；重新点 UVR 会从固定提交获取并校验正确文件。
 - `audio-separator is required`：解压版的内部 Python 依赖缺失或被隔离；核对发行 SHA-256 并重新完整解压，不要在包内运行 `pip install`。源码环境则重新安装对应 requirements。
 - `vocal separation produced an invalid WAV file`：检查 FFmpeg、磁盘空间和源音轨。
 
-Kaor 直接使用 UVR5 推理核心和下载到程序目录的 checkpoint，不调用 UVR 图形界面。
+Kaor 直接使用 UVR5 推理核心和下载到程序目录的 YAML 与 checkpoint，不调用 UVR 图形界面。
 
 <a id="audio-worker-missing"></a>
 

@@ -64,22 +64,6 @@ jobs:
           }
           "version=$version" >> $env:GITHUB_OUTPUT
 
-      - name: Download and verify the bundled BS-Roformer configuration
-        shell: pwsh
-        run: |
-          $root = Join-Path $env:RUNNER_TEMP "kaor-uvr"
-          $modelDir = Join-Path $root "models\MDX_Net_Models"
-          $configDir = Join-Path $modelDir "model_data\mdx_c_configs"
-          New-Item -ItemType Directory -Path $configDir -Force | Out-Null
-          $config = Join-Path $configDir "model_bs_roformer_ep_317_sdr_12.9755.yaml"
-          Invoke-WebRequest `
-            -Uri "https://raw.githubusercontent.com/ZFTurbo/Music-Source-Separation-Training/main/configs/viperx/model_bs_roformer_ep_317_sdr_12.9755.yaml" `
-            -OutFile $config
-          if ((Get-FileHash $config -Algorithm SHA256).Hash -ne "2BFDD16C656BD9519ABA757CC4F8834B7EDE675EB1E00EC4772D74AE1C41AF7F") {
-            throw "BS-Roformer config SHA-256 mismatch"
-          }
-          "KAOR_RELEASE_UVR_ROOT=$root" >> $env:GITHUB_ENV
-
       - name: Download and verify the bundled PP-OCRv6 assets
         shell: pwsh
         run: |
@@ -118,8 +102,7 @@ jobs:
           .\scripts\build-portable.ps1 `
             -RuntimeProfile "${{ matrix.profile }}" `
             -Version "${{ steps.version.outputs.version }}" `
-            -Python "python" `
-            -UvrRoot "$env:KAOR_RELEASE_UVR_ROOT"
+            -Python "python"
 
       - name: Remove unpacked build intermediates
         if: always()

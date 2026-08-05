@@ -113,7 +113,7 @@ models\uvr\model_bs_roformer_ep_317_sdr_12.9755.ckpt
 models\uvr\model_bs_roformer_ep_317_sdr_12.9755.yaml
 ```
 
-Kaor 不读取外部 UVR5 安装目录。YAML 随三个发行包提供；checkpoint 在第一次启动 UVR 阶段时从上游原发布页断点下载到上述目录，完成后核对 `639331213` 字节和固定 SHA-256。下载成功后可离线复用，推理由独立的 `KaorAudioWorker.exe` 执行。
+Kaor 不读取外部 UVR5 安装目录。YAML 与 checkpoint 在第一次启动 UVR 阶段时从各自固定上游地址下载到上述目录；YAML 核对 `2273` 字节和固定 SHA-256，checkpoint 支持断点续传并核对 `639331213` 字节和固定 SHA-256。下载成功后可离线复用，推理由独立的 `KaorAudioWorker.exe` 执行。
 
 选择源语言后，模型列表只显示该语言的专用 ASR。模型标记为“已下载”时直接从 `models/asr/<model-id>/` 加载；否则首次任务自动下载。当前列表覆盖日语、英语、中文、韩语、西班牙语、法语、德语和俄语。
 
@@ -331,7 +331,7 @@ data\projects\<project_id>\exports\
 
 ## 12. 模型和网络
 
-本地运行不等于永不联网：第一次运行 UVR5 会从上游下载约 610 MiB 的固定 BS-Roformer checkpoint；所选语言的 ASR 模型首次缺失时会自动下载；发行包未携带 NeMo 说话人模型时，首次需要说话人聚类也会下载；一键部署本地翻译时还会下载固定 llama.cpp 运行时和用户选择的 GGUF。下载支持断点续传，完整性检查失败的文件不会被启动。
+本地运行不等于永不联网：第一次运行 UVR5 会从固定上游地址下载匹配 YAML 和约 610 MiB 的 BS-Roformer checkpoint；所选语言的 ASR 模型首次缺失时会自动下载；发行包未携带 NeMo 说话人模型时，首次需要说话人聚类也会下载；一键部署本地翻译时还会下载固定 llama.cpp 运行时和用户选择的 GGUF。checkpoint 下载支持断点续传，完整性检查失败的文件不会被启动。
 
 从源码创建 NVIDIA 环境时，PyTorch 必须显式走官方 CUDA 12.6 索引；若 `pip` 默认使用不含 GPU wheel 的镜像，请先执行：
 
@@ -350,7 +350,7 @@ data\projects\<project_id>\exports\
 | AMD | OCR CPU、音频 CPU、本地翻译 Vulkan | Windows PaddleOCR 与当前 PyTorch 音频链不宣称 AMD GPU 加速 |
 | NVIDIA | OCR CUDA 12.6、音频 CUDA 12.6、本地翻译 CUDA | 需要兼容驱动，不要求安装 CUDA Toolkit |
 
-三套包均包含程序启动与固定流水线所需的 Python 运行时、库和二进制。BS-Roformer checkpoint、语言专用 ASR 与可选本地翻译模型按需下载，不属于“额外配置环境”；下载完成后由 Kaor 自行管理。用户不需要执行任何 Python 或包管理命令。每套发行资产提供外部 SHA-256，包内另有逐文件清单。
+三套包均包含程序启动与固定流水线所需的 Python 运行时、库和二进制。BS-Roformer YAML 与 checkpoint、语言专用 ASR 与可选本地翻译模型按需下载，不属于“额外配置环境”；下载完成后由 Kaor 自行管理。用户不需要执行任何 Python 或包管理命令。每套发行资产提供外部 SHA-256，包内另有逐文件清单。
 
 ## 14. 开源许可证
 

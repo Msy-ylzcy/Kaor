@@ -59,35 +59,29 @@ under their upstream terms; the Kaor MIT License does not relicense them.
 
 ## BS-Roformer vocal-separation model
 
-The three Windows portable profiles bundle the BS-Roformer inference runtime
-and `model_bs_roformer_ep_317_sdr_12.9755.yaml`, but do not redistribute the
-matching checkpoint (attributed as a viperx model by the upstream catalog).
-When the user first starts the UVR stage, Kaor downloads the checkpoint directly
-from the fixed upstream location, verifies its size and SHA-256, and stores it
-under the portable package's `models/uvr/` directory. Kaor does not scan an
-existing UVR5 installation or an environment-variable path.
+The three Windows portable profiles bundle the BS-Roformer inference runtime,
+but do not redistribute its YAML or checkpoint (attributed as a viperx model by
+the upstream catalog). When the user first starts the UVR stage, Kaor downloads
+both files from fixed upstream locations, verifies their byte lengths and
+SHA-256 values, and stores them under the portable package's `models/uvr/`
+directory. Kaor does not scan an existing UVR5 installation or an
+environment-variable path.
 
-The checkpoint is downloaded by Kaor's first-use downloader from the public
-`TRvlvr/model_repo` GitHub Release and is validated as 639,331,213 bytes with
-SHA-256
+The checkpoint comes from the public `TRvlvr/model_repo` GitHub Release and is
+validated as 639,331,213 bytes with SHA-256
 `5b84f37e8d444c8cb30c79d77f613a41c05868ff9c9ac6c7049c00aefae115aa`.
-The matching YAML comes from
-`ZFTurbo/Music-Source-Separation-Training`, whose repository publishes the MIT
-License retained as `licenses/ZFTURBO-MSS-MIT.txt`.
+The matching 2,273-byte YAML comes from `TRvlvr/application_data` commit
+`22b79fc01ada8f3b9e3526ad0ed645af414a7cde` and is validated with SHA-256
+`2bfdd16c656bd9519aba757cc4f8834b7ede675eb1e00ec4772d74ae1c41af7f`.
 
-**Redistribution status:** as checked on 2026-08-05, the
-`TRvlvr/model_repo` repository has no `LICENSE` file and the
-`all_public_uvr_models` Release page does not state a license for this
-checkpoint. Public download availability is not, by itself, an explicit grant
-to redistribute the weight inside another product. The ZFTurbo repository's
-MIT License is the license published by the repository that contains the YAML,
-and no file-specific exception for that YAML was found; it must not be
-presented as the checkpoint's license. Kaor therefore excludes this weight from
-its public archives. Before publishing any future Kaor archive containing the
-weight, the release maintainer must obtain and retain an explicit redistribution
-grant from the model rightsholder/distributor or replace the checkpoint with a
-model whose terms expressly permit the intended redistribution. Kaor's MIT
-License cannot override that boundary.
+**Redistribution status:** as checked on 2026-08-05, neither upstream location
+displayed terms that explicitly permit Kaor to repackage these two files.
+Public download availability is not, by itself, an explicit redistribution
+grant. Kaor therefore excludes both files from its public archives. Before a
+future Kaor archive embeds either file, the release maintainer must retain an
+explicit grant from the applicable rightsholder/distributor or select assets
+whose published terms permit the intended redistribution. Kaor's MIT License
+cannot override that boundary.
 
 Full provenance, hashes, source URLs, and this unresolved license boundary are
 retained in `licenses/BS-ROFORMER-MODEL-NOTICE.txt`.
