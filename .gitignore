@@ -41,6 +41,7 @@ artifacts/
 build/
 dist/
 .build/
+Microsoft/Windows/PowerShell/ModuleAnalysisCache
 *.zip
 *.sha256
 
