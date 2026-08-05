@@ -481,7 +481,6 @@ $requiredReleaseFiles = @(
     "SECURITY.md",
     "RELEASE.json",
     "DEPENDENCIES-PYTHON.txt",
-    "models\paddlex\official_models\PP-OCRv6_medium_det\configuration.json",
     "models\paddlex\official_models\PP-OCRv6_medium_det\inference.json",
     "models\paddlex\official_models\PP-OCRv6_medium_det\inference.pdiparams",
     "models\paddlex\official_models\PP-OCRv6_medium_det\inference.yml",

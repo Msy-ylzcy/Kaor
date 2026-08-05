@@ -51,7 +51,6 @@ PP-OCRv6 medium 文件，写入 `models/paddlex/official_models/` 后才调用�
 
 | 模型 | 文件 | 字节数 | SHA-256 |
 | --- | --- | ---: | --- |
-| det | `configuration.json` | 71 | `2e1c5a9e1cdae7ee2a28ac27d4e25172029cfa661cbeb4418f6be9998ef02f79` |
 | det | `inference.json` | 312150 | `0f1a7ec35da36173529c7a60238b7f7919e3831929c3f700ad90ad4896adecd5` |
 | det | `inference.pdiparams` | 61960476 | `85218d2e3d98f5a21c58b4220627be923a97aee5db3cc71f39536ab31ac53960` |
 | det | `inference.yml` | 886 | `7298d5ead546584af2504d03355f881ac7a7bc0eb1e282d3e159277c1d0af871` |

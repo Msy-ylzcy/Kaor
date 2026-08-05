@@ -7,11 +7,6 @@
       "directory": "PP-OCRv6_medium_det",
       "files": [
         {
-          "name": "configuration.json",
-          "size": 71,
-          "sha256": "2e1c5a9e1cdae7ee2a28ac27d4e25172029cfa661cbeb4418f6be9998ef02f79"
-        },
-        {
           "name": "inference.json",
           "size": 312150,
           "sha256": "0f1a7ec35da36173529c7a60238b7f7919e3831929c3f700ad90ad4896adecd5"

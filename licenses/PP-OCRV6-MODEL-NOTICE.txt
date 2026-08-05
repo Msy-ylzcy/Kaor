@@ -16,7 +16,6 @@ Resolved source prefix:
 https://huggingface.co/PaddlePaddle/PP-OCRv6_medium_det/resolve/e42c8690e385ae9639912cad7b65e1de8075314d/
 
 File                  Size (bytes)  SHA-256
-configuration.json             71  2e1c5a9e1cdae7ee2a28ac27d4e25172029cfa661cbeb4418f6be9998ef02f79
 inference.json             312150  0f1a7ec35da36173529c7a60238b7f7919e3831929c3f700ad90ad4896adecd5
 inference.pdiparams      61960476  85218d2e3d98f5a21c58b4220627be923a97aee5db3cc71f39536ab31ac53960
 inference.yml                886  7298d5ead546584af2504d03355f881ac7a7bc0eb1e282d3e159277c1d0af871
