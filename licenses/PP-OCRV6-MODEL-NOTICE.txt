@@ -19,7 +19,7 @@ File                  Size (bytes)  SHA-256
 inference.json             312150  0f1a7ec35da36173529c7a60238b7f7919e3831929c3f700ad90ad4896adecd5
 inference.pdiparams      61960476  85218d2e3d98f5a21c58b4220627be923a97aee5db3cc71f39536ab31ac53960
 inference.yml                886  7298d5ead546584af2504d03355f881ac7a7bc0eb1e282d3e159277c1d0af871
-README.md                  23247  59f37b08a9a49aa6c1275e7b0363991353582f4dc7676539a5d2b05aab57e744
+README.md                   6366  c727acae3889adc1f9caff2db94ec32fa3e85c31da943241aceb0ee01ef8f808
 
 Recognition model
 -----------------
