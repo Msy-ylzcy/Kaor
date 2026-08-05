@@ -42,4 +42,5 @@ def test_nvidia_build_installs_paddle_wheel_without_conflicting_metadata():
     assert '"--no-deps",' in build_script
     assert "$paddleGpuWheel" in build_script
     assert "paddlepaddle-gpu @" not in requirements
+    assert "opt-einsum==3.3.0" in requirements
     assert "nvidia-cudnn-cu12==9.9.0.52" in requirements

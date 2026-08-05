@@ -3,6 +3,7 @@
 # build script so a machine-wide CPU mirror cannot silently replace it.
 -r requirements-runtime-common.txt
 nvidia-cuda-runtime-cu12==12.6.77
+opt-einsum==3.3.0
 # Paddle's cu126 wheel metadata requests 9.5.1.17, but the loaded binary reports
 # it was compiled against cuDNN 9.9. Use the binary-compatible version; OCR and
 # Torch are isolated in separate processes to prevent DLL mixing.
