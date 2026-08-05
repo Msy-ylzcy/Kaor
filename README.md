@@ -186,7 +186,7 @@ npm.cmd run build --prefix apps/web
 .\.venv-nvidia-cu126\Scripts\python.exe -m compileall -q backend kaor.py
 ```
 
-完整使用方法见 [中文使用手册](docs/USER_GUIDE.zh-CN.md)，错误处理见 [中文故障排查](docs/TROUBLESHOOTING.zh-CN.md)，模块与数据流见 [架构和运行原理](docs/ARCHITECTURE.zh-CN.md)，发行构建见 [Windows 发行说明](docs/RELEASE_BUILD.zh-CN.md)。
+完整使用方法见 [中文使用手册](docs/USER_GUIDE.zh-CN.md)，从下载到成片的录制脚本见 [完整教程录制流程](docs/TUTORIAL_RECORDING.zh-CN.md)，错误处理见 [中文故障排查](docs/TROUBLESHOOTING.zh-CN.md)，模块与数据流见 [架构和运行原理](docs/ARCHITECTURE.zh-CN.md)，发行构建见 [Windows 发行说明](docs/RELEASE_BUILD.zh-CN.md)。
 
 ## 发行完整性
 
