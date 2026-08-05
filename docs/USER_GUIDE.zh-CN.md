@@ -106,14 +106,14 @@ OCR 帧批处理保持“自动”时，会按 PaddlePaddle 识别到的设备�
 
 任务卡实时显示阶段消息。静音切分会依次显示读取音频、检测边界和“正在写入第 N/总数个切片”；NeMo ASR 显示当前切片批次范围/总数，FunASR 显示当前切片序号/总数。一键流程的进度区间为 UVR5 `0%-55%`、16 kHz 准备约 `57%`、切分 `59%-68%`、ASR `68%-100%`；单独运行时每个阶段使用自己的 `0%-100%` 进度。
 
-解压版固定读取包内 UVR5 资源：
+解压版固定读取程序目录内的 UVR5 资源：
 
 ```text
 models\uvr\model_bs_roformer_ep_317_sdr_12.9755.ckpt
 models\uvr\model_bs_roformer_ep_317_sdr_12.9755.yaml
 ```
 
-Kaor 不读取外部 UVR5 安装目录。checkpoint 与 YAML 随三个发行包提供并做长度、SHA-256 校验；推理由独立的 `KaorAudioWorker.exe` 执行。
+Kaor 不读取外部 UVR5 安装目录。YAML 随三个发行包提供；checkpoint 在第一次启动 UVR 阶段时从上游原发布页断点下载到上述目录，完成后核对 `639331213` 字节和固定 SHA-256。下载成功后可离线复用，推理由独立的 `KaorAudioWorker.exe` 执行。
 
 选择源语言后，模型列表只显示该语言的专用 ASR。模型标记为“已下载”时直接从 `models/asr/<model-id>/` 加载；否则首次任务自动下载。当前列表覆盖日语、英语、中文、韩语、西班牙语、法语、德语和俄语。
 
@@ -331,7 +331,7 @@ data\projects\<project_id>\exports\
 
 ## 12. 模型和网络
 
-本地运行不等于永不联网：所选语言的 ASR 模型首次缺失时会自动下载；发行包未携带 NeMo 说话人模型时，首次需要说话人聚类也会下载；一键部署本地翻译时还会下载固定 llama.cpp 运行时和用户选择的 GGUF。下载支持断点续传，完整性检查失败的文件不会被启动。
+本地运行不等于永不联网：第一次运行 UVR5 会从上游下载约 610 MiB 的固定 BS-Roformer checkpoint；所选语言的 ASR 模型首次缺失时会自动下载；发行包未携带 NeMo 说话人模型时，首次需要说话人聚类也会下载；一键部署本地翻译时还会下载固定 llama.cpp 运行时和用户选择的 GGUF。下载支持断点续传，完整性检查失败的文件不会被启动。
 
 从源码创建 NVIDIA 环境时，PyTorch 必须显式走官方 CUDA 12.6 索引；若 `pip` 默认使用不含 GPU wheel 的镜像，请先执行：
 
@@ -350,7 +350,7 @@ data\projects\<project_id>\exports\
 | AMD | OCR CPU、音频 CPU、本地翻译 Vulkan | Windows PaddleOCR 与当前 PyTorch 音频链不宣称 AMD GPU 加速 |
 | NVIDIA | OCR CUDA 12.6、音频 CUDA 12.6、本地翻译 CUDA | 需要兼容驱动，不要求安装 CUDA Toolkit |
 
-三套包均包含程序启动与固定流水线所需的 Python 运行时、库、二进制和 BS-Roformer。语言专用 ASR 与可选本地翻译模型按需下载，不属于“额外配置环境”；下载完成后由 Kaor 自行管理。用户不需要执行任何 Python 或包管理命令。每套发行资产提供外部 SHA-256，包内另有逐文件清单。
+三套包均包含程序启动与固定流水线所需的 Python 运行时、库和二进制。BS-Roformer checkpoint、语言专用 ASR 与可选本地翻译模型按需下载，不属于“额外配置环境”；下载完成后由 Kaor 自行管理。用户不需要执行任何 Python 或包管理命令。每套发行资产提供外部 SHA-256，包内另有逐文件清单。
 
 ## 14. 开源许可证
 

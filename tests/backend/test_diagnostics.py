@@ -20,7 +20,7 @@ def test_real_error_lines_are_linked_to_repair_guides():
         "translation request failed: HTTP 524 origin_response_timeout"
     )
     assert "uvr-model-damaged" in matching_guides(
-        "bundled UVR model is missing or incomplete"
+        "BS-Roformer checkpoint download failed from the fixed upstream"
     )
     assert "gpu-out-of-memory" in matching_guides("CUDA out of memory")
 

@@ -59,14 +59,15 @@ under their upstream terms; the Kaor MIT License does not relicense them.
 
 ## BS-Roformer vocal-separation model
 
-The three Windows portable profiles are designed to bundle
-`model_bs_roformer_ep_317_sdr_12.9755.ckpt` (attributed as a viperx model by the
-upstream catalog) and its YAML configuration so UVR works without a separate
-Python or UVR5 installation. At runtime Kaor reads only the copy under the
-portable package's `models/uvr/` directory. It does not scan an existing UVR5
-installation or an environment-variable path.
+The three Windows portable profiles bundle the BS-Roformer inference runtime
+and `model_bs_roformer_ep_317_sdr_12.9755.yaml`, but do not redistribute the
+matching checkpoint (attributed as a viperx model by the upstream catalog).
+When the user first starts the UVR stage, Kaor downloads the checkpoint directly
+from the fixed upstream location, verifies its size and SHA-256, and stores it
+under the portable package's `models/uvr/` directory. Kaor does not scan an
+existing UVR5 installation or an environment-variable path.
 
-The checkpoint is downloaded by the release workflow from the public
+The checkpoint is downloaded by Kaor's first-use downloader from the public
 `TRvlvr/model_repo` GitHub Release and is validated as 639,331,213 bytes with
 SHA-256
 `5b84f37e8d444c8cb30c79d77f613a41c05868ff9c9ac6c7049c00aefae115aa`.
@@ -81,12 +82,12 @@ checkpoint. Public download availability is not, by itself, an explicit grant
 to redistribute the weight inside another product. The ZFTurbo repository's
 MIT License is the license published by the repository that contains the YAML,
 and no file-specific exception for that YAML was found; it must not be
-presented as the checkpoint's license. Before publishing a Kaor
-archive containing this weight, the release maintainer must obtain and retain
-an explicit redistribution grant from the model rightsholder/distributor or
-replace the checkpoint with a model whose terms expressly permit the intended
-redistribution. This is a release gate, not something Kaor's MIT License can
-override.
+presented as the checkpoint's license. Kaor therefore excludes this weight from
+its public archives. Before publishing any future Kaor archive containing the
+weight, the release maintainer must obtain and retain an explicit redistribution
+grant from the model rightsholder/distributor or replace the checkpoint with a
+model whose terms expressly permit the intended redistribution. Kaor's MIT
+License cannot override that boundary.
 
 Full provenance, hashes, source URLs, and this unresolved license boundary are
 retained in `licenses/BS-ROFORMER-MODEL-NOTICE.txt`.

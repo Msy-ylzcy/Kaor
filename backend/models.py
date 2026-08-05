@@ -396,11 +396,12 @@ class UvrModelInfo(BaseModel):
     filename: str
     available: bool
     runtime: str = "uvr5-local-core"
-    load_mode: str = "in_place"
+    load_mode: str = "local-or-auto-download"
     root_path: str | None = None
     path: str | None = None
     config_path: str | None = None
     size_bytes: int | None = None
+    download_size_mb: int | None = None
 
 
 class DiarizationModelInfo(BaseModel):

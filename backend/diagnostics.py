@@ -107,10 +107,10 @@ REPAIR_GUIDES: tuple[RepairGuide, ...] = (
     ),
     RepairGuide(
         "uvr-model-damaged",
-        "包内 BS-Roformer 模型缺失或损坏",
-        "人声分离只读取发行包 models/uvr 内的固定 CKPT 与 YAML。",
-        ("bundled UVR model", "UVR model size mismatch", "BS-Roformer", "model_bs_roformer"),
-        ("确认 models/uvr 下 CKPT 为 639331213 字节。", "对照发布页 SHA-256 校验。", "重新解压发行包，不要从旧目录覆盖 models/uvr。"),
+        "BS-Roformer 下载失败或校验异常",
+        "首次人声分离会从固定上游下载 CKPT，校验后只读取 models/uvr 内的 CKPT 与 YAML。",
+        ("UVR model download", "UVR model size mismatch", "SHA-256 mismatch", "BS-Roformer", "model_bs_roformer"),
+        ("检查 VPN、代理和 GitHub Release 是否可访问。", "确认程序目录可写并保留 .part 后重试。", "若哈希仍不一致，删除错误的 CKPT 与 .part，再从日志中的固定上游重新下载。"),
         "uvr-model-damaged",
     ),
     RepairGuide(

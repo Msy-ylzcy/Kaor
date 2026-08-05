@@ -27,7 +27,7 @@ WebUI 日志页可按来源、级别和关键词筛选，点击日志行展开�
 | `PaddleOCR is not installed` / `No module named 'paddle'` | OCR 运行时缺失，重新完整解压对应版本并检查安全软件隔离区 |
 | `CUDA was requested` / `no kernel image` / `cudnn` | 驱动或 CUDA 发行包不匹配 |
 | `out of memory` / `failed to allocate` | 降低 OCR/ASR 批量、本地模型或上下文 |
-| `bundled UVR model` / `UVR model size mismatch` | 包内 BS-Roformer 缺失或损坏 |
+| `UVR model download failed` / `UVR model size mismatch` / `SHA-256 mismatch` | BS-Roformer 首次下载失败、不完整或被代理替换 |
 | `KaorAudioWorker.exe` / `worker exited without a result` | 音频 Worker 缺失、被拦截或崩溃 |
 | `PyTorch is required` / `No module named 'torch'` / `audio-separator is required` / `nemo` / `funasr` | 音频推理模块缺失或发行包目录被混用 |
 | `ffmpeg was not found` / `Invalid data found` | FFmpeg 或片源异常 |
@@ -143,24 +143,25 @@ $Caps = Invoke-RestMethod "$Base/api/audio/capabilities"
 $Caps.uvr_model | ConvertTo-Json -Depth 8
 ```
 
-解压版固定需要：
+解压版固定使用：
 
 ```text
 models\uvr\model_bs_roformer_ep_317_sdr_12.9755.ckpt
 models\uvr\model_bs_roformer_ep_317_sdr_12.9755.yaml
 ```
 
-程序不再读取外部 UVR5 路径。checkpoint 必须为 `639331213` 字节，SHA-256 为 `5b84f37e8d444c8cb30c79d77f613a41c05868ff9c9ac6c7049c00aefae115aa`；文件不符时重新完整解压发行包。
+程序不读取外部 UVR5 路径。YAML 随包提供；checkpoint 在第一次运行 UVR 阶段时直接从上游原发布页断点下载，必须为 `639331213` 字节，SHA-256 为 `5b84f37e8d444c8cb30c79d77f613a41c05868ff9c9ac6c7049c00aefae115aa`。
 
 常见错误：
 
-- `UVR model not found`：checkpoint 路径不对。
-- `UVR model size mismatch`：文件下载不完整或不是预期模型。
+- `UVR model download failed`：检查 VPN、代理、防火墙和 GitHub Release 可访问性，然后重新点 UVR；已有 `.part` 会续传。
+- `UVR model not found`：下载尚未完成，或程序目录不可写；把整包解压到普通可写目录。
+- `UVR model size mismatch` / `SHA-256 mismatch`：删除对应 `.part` 和错误的 checkpoint 后重试，避免代理返回 HTML 错误页。
 - `UVR model config not found`：缺少对应 YAML。
 - `audio-separator is required`：解压版的内部 Python 依赖缺失或被隔离；核对发行 SHA-256 并重新完整解压，不要在包内运行 `pip install`。源码环境则重新安装对应 requirements。
 - `vocal separation produced an invalid WAV file`：检查 FFmpeg、磁盘空间和源音轨。
 
-Kaor 直接使用 UVR5 推理核心和本地 checkpoint，不调用 UVR 图形界面。
+Kaor 直接使用 UVR5 推理核心和下载到程序目录的 checkpoint，不调用 UVR 图形界面。
 
 <a id="audio-worker-missing"></a>
 

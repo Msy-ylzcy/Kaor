@@ -38,8 +38,6 @@ $torchVisionVersion = "0.26.0"
 $githubReleaseAssetLimit = 2GB
 $uvrModelName = "model_bs_roformer_ep_317_sdr_12.9755.ckpt"
 $uvrConfigName = "model_bs_roformer_ep_317_sdr_12.9755.yaml"
-$uvrModelSize = 639331213
-$uvrModelSha256 = "5b84f37e8d444c8cb30c79d77f613a41c05868ff9c9ac6c7049c00aefae115aa"
 $uvrConfigSha256 = "2bfdd16c656bd9519aba757cc4f8834b7ede675eb1e00ec4772d74ae1c41af7f"
 $diarizationModelNames = @("vad_multilingual_marblenet.nemo", "titanet_large.nemo")
 
@@ -136,24 +134,13 @@ $diarizationModelsBundled = (
 if ($BundleDiarizationModels -and -not $diarizationModelsBundled) {
     throw "Incomplete models\diarization input. Provide both complete NeMo model archives or remove the partial files."
 }
-$repositoryUvrModel = Join-Path $modelsDirectory "uvr\$uvrModelName"
 $repositoryUvrConfig = Join-Path $modelsDirectory "uvr\$uvrConfigName"
-$repositoryHasUvrAssets = (
-    (Test-Path -LiteralPath $repositoryUvrModel -PathType Leaf) -and
-    (Test-Path -LiteralPath $repositoryUvrConfig -PathType Leaf)
-)
-if (-not $repositoryHasUvrAssets -and [string]::IsNullOrWhiteSpace($UvrRoot)) {
-    throw "Missing models\uvr assets. Maintainer builds may pass -UvrRoot explicitly."
-}
-$uvrModelSource = if ($repositoryHasUvrAssets) {
-    $repositoryUvrModel
-} else {
-    Join-Path $UvrRoot "models\MDX_Net_Models\$uvrModelName"
-}
-$uvrConfigSource = if ($repositoryHasUvrAssets) {
+$uvrConfigSource = if (Test-Path -LiteralPath $repositoryUvrConfig -PathType Leaf) {
     $repositoryUvrConfig
-} else {
+} elseif (-not [string]::IsNullOrWhiteSpace($UvrRoot)) {
     Join-Path $UvrRoot "models\MDX_Net_Models\model_data\mdx_c_configs\$uvrConfigName"
+} else {
+    throw "Missing models\uvr\$uvrConfigName. Maintainer builds may pass -UvrRoot explicitly."
 }
 $binDirectory = Join-Path $repositoryRoot "bin"
 $fontsDirectory = Join-Path $repositoryRoot "fonts"
@@ -224,16 +211,7 @@ if ($ocrParameterFiles.Count -lt 2) {
     throw "Incomplete offline OCR models: expected detector and recognizer parameter files."
 }
 Assert-File -Path (Join-Path $fontsDirectory "NotoSansSC\NotoSansSC-Regular.ttf")
-Assert-File -Path $uvrModelSource
 Assert-File -Path $uvrConfigSource
-$actualUvrModel = Get-Item -LiteralPath $uvrModelSource
-if ($actualUvrModel.Length -ne $uvrModelSize) {
-    throw "UVR checkpoint size mismatch: expected $uvrModelSize bytes, found $($actualUvrModel.Length)."
-}
-$actualUvrModelHash = (Get-FileHash -LiteralPath $uvrModelSource -Algorithm SHA256).Hash.ToLowerInvariant()
-if ($actualUvrModelHash -ne $uvrModelSha256) {
-    throw "UVR checkpoint SHA-256 mismatch: $actualUvrModelHash"
-}
 $actualUvrConfigHash = (Get-FileHash -LiteralPath $uvrConfigSource -Algorithm SHA256).Hash.ToLowerInvariant()
 if ($actualUvrConfigHash -ne $uvrConfigSha256) {
     throw "UVR config SHA-256 mismatch: $actualUvrConfigHash"
@@ -419,7 +397,6 @@ if ($diarizationModelsBundled) {
 }
 $packageUvrDirectory = Join-Path $packageModelsDirectory "uvr"
 New-Item -ItemType Directory -Path $packageUvrDirectory -Force | Out-Null
-Copy-Item -LiteralPath $uvrModelSource -Destination (Join-Path $packageUvrDirectory $uvrModelName) -Force
 Copy-Item -LiteralPath $uvrConfigSource -Destination (Join-Path $packageUvrDirectory $uvrConfigName) -Force
 
 if (-not (Test-Path -LiteralPath (Join-Path $packageDirectory "bin") -PathType Container)) {
@@ -450,6 +427,7 @@ New-Item -ItemType Directory -Path (Join-Path $packageDirectory "data") -Force |
 
 foreach ($document in @(
     "README.md",
+    "CHANGELOG.md",
     "LICENSE",
     "THIRD_PARTY_NOTICES.md",
     "CONTRIBUTING.md",
@@ -470,8 +448,8 @@ $acceleration = switch ($RuntimeProfile) {
     "amd" { [ordered]@{ ocr = "cpu"; audio = "cpu"; local_translation = "vulkan-amd" } }
     "nvidia-cu126" { [ordered]@{ ocr = "cuda-12.6"; audio = "cuda-12.6"; local_translation = "cuda-or-vulkan" } }
 }
-$bundledModels = @("paddlex-ocr", "uvr-bs-roformer")
-$onDemandModels = @("language-specific-asr", "local-translation-gguf")
+$bundledModels = @("paddlex-ocr")
+$onDemandModels = @("uvr-bs-roformer", "language-specific-asr", "local-translation-gguf")
 if ($diarizationModelsBundled) {
     $bundledModels += "nemo-diarization-models"
 }
@@ -506,7 +484,7 @@ $releaseMetadata | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path
     "Runtime profile: $RuntimeProfile"
     "Python build runtime: $($pythonInfo.Trim())"
     "Torch index: $torchIndex"
-    "Model policy: OCR and UVR bundled; ASR, optional diarization, and local translation models use managed downloads"
+    "Model policy: OCR and UVR configuration bundled; BS-Roformer checkpoint, ASR, optional diarization, and local translation models use managed downloads"
     "Built at UTC: $([DateTime]::UtcNow.ToString('o'))"
 ) | Set-Content -LiteralPath (Join-Path $packageDirectory "BUILD-INFO.txt") -Encoding utf8
 
@@ -516,6 +494,7 @@ $requiredReleaseFiles = @(
     "_internal\Cython\Utility\CppSupport.cpp",
     "bin\ffmpeg.exe",
     "README.md",
+    "CHANGELOG.md",
     "LICENSE",
     "THIRD_PARTY_NOTICES.md",
     "CONTRIBUTING.md",
@@ -531,7 +510,6 @@ $requiredReleaseFiles = @(
     "models\paddlex\official_models\PP-OCRv6_medium_rec\inference.pdiparams",
     "models\paddlex\official_models\PP-OCRv6_medium_rec\inference.yml",
     "models\paddlex\official_models\PP-OCRv6_medium_rec\README.md",
-    "models\uvr\$uvrModelName",
     "models\uvr\$uvrConfigName",
     "docs\USER_GUIDE.zh-CN.md",
     "docs\TROUBLESHOOTING.zh-CN.md",
@@ -562,9 +540,14 @@ $packagedOcrModels = @(Get-ChildItem -LiteralPath (Join-Path $packageModelsDirec
 if ($packagedOcrModels.Count -lt 2) {
     throw "Release validation failed; detector and recognizer OCR models were not packaged."
 }
-$packagedUvrModel = Get-Item -LiteralPath (Join-Path $packageUvrDirectory $uvrModelName)
-if ($packagedUvrModel.Length -ne $uvrModelSize) {
-    throw "Release validation failed; bundled UVR checkpoint size is incorrect."
+$packagedUvrConfigHash = (
+    Get-FileHash -LiteralPath (Join-Path $packageUvrDirectory $uvrConfigName) -Algorithm SHA256
+).Hash.ToLowerInvariant()
+if ($packagedUvrConfigHash -ne $uvrConfigSha256) {
+    throw "Release validation failed; bundled UVR configuration SHA-256 is incorrect."
+}
+if (Test-Path -LiteralPath (Join-Path $packageUvrDirectory $uvrModelName) -PathType Leaf) {
+    throw "Release validation failed; the BS-Roformer checkpoint must be downloaded on first use, not redistributed in the portable archive."
 }
 if (Test-Path -LiteralPath (Join-Path $packageModelsDirectory "asr")) {
     throw "Release validation failed; downloaded ASR checkpoints must not be embedded in every runtime profile."

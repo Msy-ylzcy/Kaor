@@ -109,7 +109,7 @@ ROI 裁剪、灰度/边缘签名、帧差、阈值和像素计数使用 OpenCV C
 
 ### 5.1 人声分离
 
-`mix.wav` 交给包内 BS-Roformer checkpoint，按重叠窗口分块推理并重建 `vocals.wav`。运行时只解析 `models/uvr`，不扫描外部 UVR5 安装。
+`mix.wav` 交给程序管理的 BS-Roformer checkpoint，按重叠窗口分块推理并重建 `vocals.wav`。checkpoint 缺失时先从上游原发布页断点下载并校验；运行时只解析 `models/uvr`，不扫描外部 UVR5 安装。
 
 ### 5.2 静音切分
 
@@ -200,12 +200,12 @@ PyInstaller 的一次 `Analysis` 生成 `Kaor.exe` 与 `KaorAudioWorker.exe`，�
 1. 按档位创建独立 Python 3.12 环境。
 2. CPU/AMD 的 Torch 显式走清华镜像，NVIDIA 显式走 PyTorch 官方 cu126 索引。
 3. 构建 WebUI并运行后端测试。
-4. 收集 Python、Paddle、Torch、NeMo/FunASR、OCR 模型、UVR 模型、FFmpeg 和字体。
+4. 收集 Python、Paddle、Torch、NeMo/FunASR、OCR 模型、UVR 配置、FFmpeg 和字体。
 5. 运行打包后的音频 Worker `probe`。
 6. 写入依赖清单、发行档位、逐文件 SHA-256、ZIP SHA-256 和 sidecar JSON。
 7. 拒绝超过 GitHub 单资产 2 GiB 限制的意外包。
 
-三套发行物都必须交付完整 Python 运行时、原生库、固定 OCR/UVR 资源和音频 Worker。最终用户只需要完整解压并双击，不运行 `pip`、不创建虚拟环境，也不安装 CUDA Toolkit。按需 ASR/GGUF 下载属于应用功能，不是环境安装。
+三套发行物都必须交付完整 Python 运行时、原生库、固定 OCR 模型、UVR 配置和音频 Worker。最终用户只需要完整解压并双击，不运行 `pip`、不创建虚拟环境，也不安装 CUDA Toolkit。BS-Roformer checkpoint、ASR 和 GGUF 的受控下载属于应用功能，不是环境安装。
 
 ## 13. 许可证边界
 

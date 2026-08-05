@@ -439,7 +439,9 @@ function OcrInspector(props: InspectorProps) {
                   <small title={props.audioCapabilities?.uvr_model.path ?? undefined}>
                     {props.audioCapabilities?.uvr_model.available
                       ? `${props.audioCapabilities.uvr_model.label} · 本地就绪`
-                      : props.audioCapabilities?.uvr_model.label ?? "BS-RoFormer"}
+                      : props.audioCapabilities?.uvr_model
+                        ? `${props.audioCapabilities.uvr_model.label} · 首次自动下载约 ${props.audioCapabilities.uvr_model.download_size_mb ?? 610} MiB`
+                        : "BS-RoFormer"}
                   </small>
                 </p>
                 <button className="button secondary compact-button" type="button" aria-label="运行 UVR5 人声分离" onClick={() => props.onStartJob("uvr", { device: audioDevice })}>
@@ -761,18 +763,20 @@ function AudioRuntimeStatus({ capabilities, model }: { capabilities: AudioCapabi
   if (!capabilities) {
     return <div className="audio-runtime-state is-warning"><LoaderCircle size={14} /><span><strong>运行时状态未取得</strong><small>本地服务连接后自动检测</small></span></div>;
   }
-  const runtimeReady = capabilities.torch_available && capabilities.audio_separator_available && capabilities.ffmpeg_available && capabilities.uvr_model.available;
+  const runtimeReady = capabilities.torch_available && capabilities.audio_separator_available && capabilities.ffmpeg_available;
   return (
     <div className={`audio-runtime-state ${runtimeReady ? "is-ready" : "is-warning"}`}>
       {runtimeReady ? <CheckCircle2 size={14} /> : <AlertTriangle size={14} />}
       <span>
         <strong>{runtimeReady ? "音频运行时就绪" : "音频运行时待安装"}</strong>
         <small>
-          {model?.installed
-            ? "ASR 模型已下载"
-            : model
-              ? `首次任务自动下载${model.download_size_mb ? ` · 约 ${model.download_size_mb} MB` : ""}`
-              : capabilities.errors[0] ?? "请选择语言专用模型"}
+          {!capabilities.uvr_model.available
+            ? `UVR 首次任务自动下载 · 约 ${capabilities.uvr_model.download_size_mb ?? 610} MiB`
+            : model?.installed
+              ? "ASR 模型已下载"
+              : model
+                ? `ASR 首次任务自动下载${model.download_size_mb ? ` · 约 ${model.download_size_mb} MB` : ""}`
+                : capabilities.errors[0] ?? "请选择语言专用模型"}
         </small>
       </span>
     </div>

@@ -14,6 +14,7 @@ from .audio_pipeline import (
     AsrModelSpec,
     UVR_CONFIG_FILENAME,
     UVR_MODEL_FILENAME,
+    ensure_uvr_checkpoint,
     resolve_uvr_assets,
 )
 from .diarization import SPEAKER_COLORS, diarize_cues
@@ -61,6 +62,13 @@ def separate_vocals(
             "audio-separator is required for local BS-Roformer vocal separation"
         ) from exc
 
+    ensure_uvr_checkpoint(
+        progress=(
+            (lambda value, message: progress(0.01 + value * 0.34, message))
+            if progress
+            else None
+        )
+    )
     model_path, config_path, error = resolve_uvr_assets()
     if error or model_path is None or config_path is None:
         raise AudioPipelineError(error or "UVR model assets are missing")
@@ -83,7 +91,7 @@ def separate_vocals(
             )
 
     if progress:
-        progress(0.02, f"Loading local UVR5 BS-Roformer: {model_path}")
+        progress(0.36, f"Loading local UVR5 BS-Roformer: {model_path}")
     try:
         separator = LocalUvrSeparator(
             output_dir=str(output_dir),
@@ -101,7 +109,7 @@ def separate_vocals(
         )
         separator.load_model(model_filename=UVR_MODEL_FILENAME)
         if progress:
-            progress(0.12, "Separating vocals from accompaniment")
+            progress(0.42, "Separating vocals from accompaniment")
         outputs = separator.separate(
             str(input_wav.resolve()), custom_output_names={"Vocals": "vocals"}
         )

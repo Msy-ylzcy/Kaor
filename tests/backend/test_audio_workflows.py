@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import sys
 import time
@@ -151,6 +152,8 @@ def test_audio_capabilities_api_is_offline_and_marks_recommended_models(
     assert payload["cuda_available"] is False
     assert payload["default_device"] == "cpu"
     assert payload["uvr_model"]["available"] is False
+    assert payload["uvr_model"]["load_mode"] == "local-or-auto-download"
+    assert payload["uvr_model"]["download_size_mb"] == 610
     assert "diarization_model" in payload
     assert payload["errors"] == ["missing fixture"]
     assert payload["asr_models"]
@@ -204,6 +207,94 @@ def test_language_model_download_uses_injected_local_snapshot(tmp_path, monkeypa
     assert audio_pipeline.asr_model_installed(tmp_path / "models", model) is True
 
 
+def test_uvr_checkpoint_download_resumes_and_installs_atomically(tmp_path, monkeypatch):
+    payload = b"hello world"
+    monkeypatch.setattr(audio_pipeline, "UVR_EXPECTED_SIZE", len(payload))
+    monkeypatch.setattr(
+        audio_pipeline, "UVR_EXPECTED_SHA256", hashlib.sha256(payload).hexdigest()
+    )
+    destination = tmp_path / audio_pipeline.UVR_MODEL_FILENAME
+    partial = destination.with_suffix(destination.suffix + ".part")
+    partial.write_bytes(payload[:6])
+    requests: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        assert str(request.url) == audio_pipeline.UVR_MODEL_URL
+        assert request.headers["range"] == "bytes=6-"
+        return httpx.Response(
+            206,
+            content=payload[6:],
+            headers={
+                "content-length": str(len(payload) - 6),
+                "content-range": "bytes 6-10/11",
+            },
+        )
+
+    events: list[tuple[float, str]] = []
+    installed = audio_pipeline.ensure_uvr_checkpoint(
+        tmp_path,
+        progress=lambda value, message: events.append((value, message)),
+        transport=httpx.MockTransport(handler),
+    )
+
+    assert installed == destination.resolve()
+    assert installed.read_bytes() == payload
+    assert not partial.exists()
+    assert len(requests) == 1
+    assert events[-1] == (1.0, "BS-Roformer checkpoint downloaded and verified")
+
+
+def test_uvr_checkpoint_hash_failure_does_not_replace_existing_file(
+    tmp_path, monkeypatch
+):
+    expected = b"expected"
+    existing = b"old-data"
+    downloaded = b"tampered"
+    monkeypatch.setattr(audio_pipeline, "UVR_EXPECTED_SIZE", len(expected))
+    monkeypatch.setattr(
+        audio_pipeline, "UVR_EXPECTED_SHA256", hashlib.sha256(expected).hexdigest()
+    )
+    destination = tmp_path / audio_pipeline.UVR_MODEL_FILENAME
+    destination.write_bytes(existing)
+
+    def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            content=downloaded,
+            headers={"content-length": str(len(downloaded))},
+        )
+
+    with pytest.raises(audio_pipeline.AudioPipelineError, match="SHA-256 mismatch"):
+        audio_pipeline.ensure_uvr_checkpoint(
+            tmp_path, transport=httpx.MockTransport(handler)
+        )
+
+    assert destination.read_bytes() == existing
+    assert not destination.with_suffix(destination.suffix + ".part").exists()
+
+
+def test_uvr_checkpoint_reuses_a_verified_local_file_without_network(
+    tmp_path, monkeypatch
+):
+    payload = b"verified"
+    monkeypatch.setattr(audio_pipeline, "UVR_EXPECTED_SIZE", len(payload))
+    monkeypatch.setattr(
+        audio_pipeline, "UVR_EXPECTED_SHA256", hashlib.sha256(payload).hexdigest()
+    )
+    destination = tmp_path / audio_pipeline.UVR_MODEL_FILENAME
+    destination.write_bytes(payload)
+
+    def handler(_request: httpx.Request) -> httpx.Response:
+        raise AssertionError("a verified checkpoint must not use the network")
+
+    installed = audio_pipeline.ensure_uvr_checkpoint(
+        tmp_path, transport=httpx.MockTransport(handler)
+    )
+
+    assert installed == destination.resolve()
+
+
 def test_speech_pipeline_separation_adapter_uses_local_assets(tmp_path, monkeypatch):
     input_wav = tmp_path / "mix.wav"
     input_wav.write_bytes(b"M" * 96)
@@ -238,6 +329,9 @@ def test_speech_pipeline_separation_adapter_uses_local_assets(tmp_path, monkeypa
         speech_pipeline,
         "resolve_uvr_assets",
         lambda: (model_path, config_path, None),
+    )
+    monkeypatch.setattr(
+        speech_pipeline, "ensure_uvr_checkpoint", lambda **_kwargs: model_path
     )
     monkeypatch.setattr(speech_pipeline, "_resolve_device", lambda _value: "cuda:0")
 

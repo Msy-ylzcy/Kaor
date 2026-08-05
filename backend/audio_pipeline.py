@@ -1,22 +1,33 @@
 from __future__ import annotations
 
+import hashlib
 import importlib.util
 import json
+import logging
 import os
+import re
 import subprocess
 import sys
+import time
+from contextlib import contextmanager
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
-from typing import Callable
+from threading import Event
+from typing import BinaryIO, Callable, Iterator
 
-from .media import application_root, find_binary
+import httpx
+
 from .diarization import resolve_model_assets as resolve_diarization_model_assets
+from .media import application_root, find_binary
 from .worker_runtime import audio_worker_command
 
 
 class AudioPipelineError(RuntimeError):
     pass
+
+
+logger = logging.getLogger("kaor.audio")
 
 
 @dataclass(frozen=True)
@@ -133,6 +144,10 @@ UVR_MODEL_FILENAME = "model_bs_roformer_ep_317_sdr_12.9755.ckpt"
 UVR_CONFIG_FILENAME = "model_bs_roformer_ep_317_sdr_12.9755.yaml"
 UVR_EXPECTED_SIZE = 639_331_213
 UVR_EXPECTED_SHA256 = "5b84f37e8d444c8cb30c79d77f613a41c05868ff9c9ac6c7049c00aefae115aa"
+UVR_MODEL_URL = (
+    "https://github.com/TRvlvr/model_repo/releases/download/"
+    "all_public_uvr_models/model_bs_roformer_ep_317_sdr_12.9755.ckpt"
+)
 
 
 def normalize_language(language: str) -> str:
@@ -195,6 +210,298 @@ def uvr_asset_roots(root: Path | None = None) -> list[Path]:
     return [(application_root() / "models" / "uvr").resolve()]
 
 
+def _hash_file(
+    path: Path,
+    *,
+    progress: Callable[[int, int], None] | None = None,
+    cancel_event: Event | None = None,
+) -> str:
+    total = path.stat().st_size
+    completed = 0
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(4 * 1024 * 1024), b""):
+            if cancel_event is not None and cancel_event.is_set():
+                raise InterruptedError("job cancelled")
+            digest.update(chunk)
+            completed += len(chunk)
+            if progress:
+                progress(completed, total)
+    return digest.hexdigest().lower()
+
+
+def _lock_file(handle: BinaryIO) -> None:
+    handle.seek(0)
+    if os.name == "nt":
+        import msvcrt
+
+        msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+        return
+
+    import fcntl
+
+    fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+
+
+def _unlock_file(handle: BinaryIO) -> None:
+    handle.seek(0)
+    if os.name == "nt":
+        import msvcrt
+
+        msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
+        return
+
+    import fcntl
+
+    fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+
+
+@contextmanager
+def _uvr_download_lock(
+    path: Path,
+    cancel_event: Event | None,
+) -> Iterator[None]:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    handle = path.open("a+b")
+    handle.seek(0, os.SEEK_END)
+    if handle.tell() == 0:
+        handle.write(b"\0")
+        handle.flush()
+    deadline = time.monotonic() + 15 * 60
+    acquired = False
+    try:
+        while not acquired:
+            if cancel_event is not None and cancel_event.is_set():
+                raise InterruptedError("job cancelled")
+            try:
+                _lock_file(handle)
+                acquired = True
+            except OSError as exc:
+                if time.monotonic() >= deadline:
+                    raise AudioPipelineError(
+                        "timed out waiting for another BS-Roformer download to finish"
+                    ) from exc
+                time.sleep(0.2)
+        yield
+    finally:
+        if acquired:
+            _unlock_file(handle)
+        handle.close()
+
+
+def ensure_uvr_checkpoint(
+    root: Path | None = None,
+    *,
+    progress: Callable[[float, str], None] | None = None,
+    cancel_event: Event | None = None,
+    transport: httpx.BaseTransport | None = None,
+) -> Path:
+    """Install the pinned UVR checkpoint on first use.
+
+    The public portable package carries the matching YAML, while this function
+    obtains the large checkpoint from its fixed upstream release. A completed
+    download is never made visible at the runtime path until both its byte size
+    and SHA-256 match the pinned values.
+    """
+
+    destination = uvr_asset_roots(root)[0] / UVR_MODEL_FILENAME
+    partial = destination.with_suffix(destination.suffix + ".part")
+    lock_path = destination.with_suffix(destination.suffix + ".download.lock")
+    last_reported = -1.0
+
+    def report(value: float, message: str, *, force: bool = False) -> None:
+        nonlocal last_reported
+        value = max(0.0, min(1.0, value))
+        if progress and (force or last_reported < 0 or value - last_reported >= 0.01):
+            progress(value, message)
+            last_reported = value
+
+    def hash_progress(
+        start: float, end: float, label: str
+    ) -> Callable[[int, int], None]:
+        def update(completed: int, total: int) -> None:
+            fraction = completed / max(total, 1)
+            report(start + fraction * (end - start), label)
+
+        return update
+
+    try:
+        with _uvr_download_lock(lock_path, cancel_event):
+            if destination.is_file():
+                if destination.stat().st_size == UVR_EXPECTED_SIZE:
+                    report(0.0, "Validating the local BS-Roformer checkpoint", force=True)
+                    actual = _hash_file(
+                        destination,
+                        progress=hash_progress(
+                            0.0, 0.05, "Validating the local BS-Roformer checkpoint"
+                        ),
+                        cancel_event=cancel_event,
+                    )
+                    if actual == UVR_EXPECTED_SHA256.lower():
+                        report(1.0, "BS-Roformer checkpoint is ready", force=True)
+                        return destination.resolve()
+                    logger.warning(
+                        "existing UVR checkpoint failed SHA-256 validation path=%s actual=%s",
+                        destination,
+                        actual,
+                    )
+                else:
+                    logger.warning(
+                        "existing UVR checkpoint has the wrong size path=%s size=%d",
+                        destination,
+                        destination.stat().st_size,
+                    )
+
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            if partial.is_file() and partial.stat().st_size > UVR_EXPECTED_SIZE:
+                partial.unlink()
+            if partial.is_file() and partial.stat().st_size == UVR_EXPECTED_SIZE:
+                report(0.0, "Validating the resumed BS-Roformer download", force=True)
+                actual = _hash_file(
+                    partial,
+                    progress=hash_progress(
+                        0.0, 0.05, "Validating the resumed BS-Roformer download"
+                    ),
+                    cancel_event=cancel_event,
+                )
+                if actual == UVR_EXPECTED_SHA256.lower():
+                    os.replace(partial, destination)
+                    report(1.0, "BS-Roformer checkpoint is ready", force=True)
+                    return destination.resolve()
+                partial.unlink()
+
+            timeout = httpx.Timeout(120.0, connect=30.0)
+            headers = {
+                "Accept": "application/octet-stream",
+                "Accept-Encoding": "identity",
+                "User-Agent": "Kaor/0.2.0",
+            }
+            logger.info("downloading pinned UVR checkpoint from %s", UVR_MODEL_URL)
+            with httpx.Client(
+                transport=transport,
+                follow_redirects=True,
+                timeout=timeout,
+                trust_env=True,
+            ) as client:
+                for _attempt in range(2):
+                    offset = partial.stat().st_size if partial.is_file() else 0
+                    request_headers = dict(headers)
+                    if offset:
+                        request_headers["Range"] = f"bytes={offset}-"
+                    downloaded_mib = offset / (1024 * 1024)
+                    expected_mib = UVR_EXPECTED_SIZE / (1024 * 1024)
+                    report(
+                        0.05 + 0.85 * offset / UVR_EXPECTED_SIZE,
+                        "Downloading BS-Roformer checkpoint "
+                        f"({downloaded_mib:.1f}/{expected_mib:.1f} MiB)",
+                        force=True,
+                    )
+                    with client.stream(
+                        "GET", UVR_MODEL_URL, headers=request_headers
+                    ) as response:
+                        if response.status_code == 416 and offset:
+                            partial.unlink(missing_ok=True)
+                            continue
+                        response.raise_for_status()
+                        append = response.status_code == 206 and offset > 0
+                        if response.status_code == 206:
+                            content_range = response.headers.get("content-range", "")
+                            match = re.fullmatch(
+                                r"bytes\s+(\d+)-(\d+)/(\d+|\*)", content_range
+                            )
+                            if not match or int(match.group(1)) != offset:
+                                raise AudioPipelineError(
+                                    "official BS-Roformer download returned an invalid "
+                                    f"Content-Range for offset {offset}: {content_range!r}"
+                                )
+                            if (
+                                match.group(3) != "*"
+                                and int(match.group(3)) != UVR_EXPECTED_SIZE
+                            ):
+                                raise AudioPipelineError(
+                                    "official BS-Roformer download size changed: expected "
+                                    f"{UVR_EXPECTED_SIZE}, upstream reported {match.group(3)}"
+                                )
+                        elif response.status_code != 200:
+                            raise AudioPipelineError(
+                                "official BS-Roformer download returned unexpected HTTP "
+                                f"{response.status_code}"
+                            )
+                        if not append:
+                            offset = 0
+                        content_length = response.headers.get("content-length", "")
+                        if content_length.isdigit():
+                            advertised_total = offset + int(content_length)
+                            if advertised_total != UVR_EXPECTED_SIZE:
+                                raise AudioPipelineError(
+                                    "official BS-Roformer download size changed: expected "
+                                    f"{UVR_EXPECTED_SIZE}, upstream reported {advertised_total}"
+                                )
+                        completed = offset
+                        with partial.open("ab" if append else "wb") as handle:
+                            for chunk in response.iter_bytes(chunk_size=1024 * 1024):
+                                if cancel_event is not None and cancel_event.is_set():
+                                    raise InterruptedError("job cancelled")
+                                if not chunk:
+                                    continue
+                                handle.write(chunk)
+                                completed += len(chunk)
+                                if completed > UVR_EXPECTED_SIZE:
+                                    raise AudioPipelineError(
+                                        "official BS-Roformer download exceeded the pinned "
+                                        f"size of {UVR_EXPECTED_SIZE} bytes"
+                                    )
+                                report(
+                                    0.05 + 0.85 * completed / UVR_EXPECTED_SIZE,
+                                    "Downloading BS-Roformer checkpoint "
+                                    f"({completed / (1024 * 1024):.1f}/"
+                                    f"{expected_mib:.1f} MiB)",
+                                )
+                            handle.flush()
+                            os.fsync(handle.fileno())
+                    break
+                else:
+                    raise AudioPipelineError(
+                        "official BS-Roformer server rejected a clean download request"
+                    )
+
+            actual_size = partial.stat().st_size if partial.is_file() else 0
+            if actual_size != UVR_EXPECTED_SIZE:
+                raise AudioPipelineError(
+                    "BS-Roformer checkpoint download is incomplete: expected "
+                    f"{UVR_EXPECTED_SIZE} bytes, received {actual_size}. Retry UVR to "
+                    f"resume from {partial}"
+                )
+            report(0.9, "Verifying the downloaded BS-Roformer checkpoint", force=True)
+            actual_sha256 = _hash_file(
+                partial,
+                progress=hash_progress(
+                    0.9, 1.0, "Verifying the downloaded BS-Roformer checkpoint"
+                ),
+                cancel_event=cancel_event,
+            )
+            if actual_sha256 != UVR_EXPECTED_SHA256.lower():
+                partial.unlink(missing_ok=True)
+                raise AudioPipelineError(
+                    "BS-Roformer checkpoint SHA-256 mismatch: expected "
+                    f"{UVR_EXPECTED_SHA256}, received {actual_sha256}. The invalid "
+                    "download was removed; retry UVR to download a clean copy"
+                )
+            os.replace(partial, destination)
+            report(1.0, "BS-Roformer checkpoint downloaded and verified", force=True)
+            logger.info("installed pinned UVR checkpoint at %s", destination)
+            return destination.resolve()
+    except InterruptedError:
+        raise
+    except AudioPipelineError:
+        raise
+    except (httpx.HTTPError, OSError) as exc:
+        raise AudioPipelineError(
+            "BS-Roformer checkpoint download failed from the fixed official upstream: "
+            f"{exc}. Retry UVR; partial data is kept at {partial} for resume"
+        ) from exc
+
+
 def resolve_uvr_assets(root: Path | None = None) -> tuple[Path | None, Path | None, str | None]:
     checked: list[str] = []
     for candidate_root in uvr_asset_roots(root):
@@ -208,7 +515,8 @@ def resolve_uvr_assets(root: Path | None = None) -> tuple[Path | None, Path | No
     return (
         None,
         None,
-        "bundled UVR model is missing or incomplete; reinstall this Kaor release: "
+        "BS-Roformer checkpoint is missing or incomplete; start UVR to download "
+        "and verify it from the fixed upstream: "
         + "; ".join(checked),
     )
 
@@ -362,11 +670,12 @@ def audio_capabilities_payload(models_root: Path) -> dict[str, object]:
             "filename": UVR_MODEL_FILENAME,
             "available": model_path is not None and config_path is not None,
             "runtime": "uvr5-local-core",
-            "load_mode": "in_place",
+            "load_mode": "local-or-auto-download",
             "root_path": str((application_root() / "models" / "uvr").resolve()),
             "path": str(model_path) if model_path else None,
             "config_path": str(config_path) if config_path else None,
             "size_bytes": model_path.stat().st_size if model_path else None,
+            "download_size_mb": round(UVR_EXPECTED_SIZE / (1024 * 1024)),
         },
         "diarization_model": {
             "id": "nemo-titanet-marblenet",

@@ -170,6 +170,7 @@ export interface LocalAudioModelStatus {
   path: string | null;
   config_path: string | null;
   size_bytes: number | null;
+  download_size_mb: number | null;
 }
 
 export interface AsrModelOption {

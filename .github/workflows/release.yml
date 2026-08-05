@@ -24,24 +24,8 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  binary-license-gate:
-    name: Verify portable model redistribution grant
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - name: Require the BS-Roformer redistribution confirmation
-        shell: bash
-        env:
-          REDISTRIBUTION_CONFIRMED: ${{ vars.KAOR_BS_ROFORMER_REDISTRIBUTION_CONFIRMED }}
-        run: |
-          if [[ "$REDISTRIBUTION_CONFIRMED" != "true" ]]; then
-            echo "Set KAOR_BS_ROFORMER_REDISTRIBUTION_CONFIRMED=true only after retaining an explicit redistribution grant. Source tags and repository publication remain independent of this portable-binary workflow." >&2
-            exit 1
-          fi
-
   portable:
     name: Build ${{ matrix.profile }}
-    needs: binary-license-gate
     runs-on: windows-latest
     timeout-minutes: 180
     strategy:
@@ -80,27 +64,17 @@ jobs:
           }
           "version=$version" >> $env:GITHUB_OUTPUT
 
-      - name: Download and verify the bundled BS-Roformer assets
+      - name: Download and verify the bundled BS-Roformer configuration
         shell: pwsh
         run: |
           $root = Join-Path $env:RUNNER_TEMP "kaor-uvr"
           $modelDir = Join-Path $root "models\MDX_Net_Models"
           $configDir = Join-Path $modelDir "model_data\mdx_c_configs"
           New-Item -ItemType Directory -Path $configDir -Force | Out-Null
-          $model = Join-Path $modelDir "model_bs_roformer_ep_317_sdr_12.9755.ckpt"
           $config = Join-Path $configDir "model_bs_roformer_ep_317_sdr_12.9755.yaml"
-          Invoke-WebRequest `
-            -Uri "https://github.com/TRvlvr/model_repo/releases/download/all_public_uvr_models/model_bs_roformer_ep_317_sdr_12.9755.ckpt" `
-            -OutFile $model
           Invoke-WebRequest `
             -Uri "https://raw.githubusercontent.com/ZFTurbo/Music-Source-Separation-Training/main/configs/viperx/model_bs_roformer_ep_317_sdr_12.9755.yaml" `
             -OutFile $config
-          if ((Get-Item $model).Length -ne 639331213) {
-            throw "Unexpected BS-Roformer checkpoint size"
-          }
-          if ((Get-FileHash $model -Algorithm SHA256).Hash -ne "5B84F37E8D444C8CB30C79D77F613A41C05868FF9C9AC6C7049C00AEFAE115AA") {
-            throw "BS-Roformer checkpoint SHA-256 mismatch"
-          }
           if ((Get-FileHash $config -Algorithm SHA256).Hash -ne "2BFDD16C656BD9519ABA757CC4F8834B7EDE675EB1E00EC4772D74AE1C41AF7F") {
             throw "BS-Roformer config SHA-256 mismatch"
           }
@@ -402,7 +376,6 @@ jobs:
           }
 
       - name: Publish release
-        if: ${{ vars.KAOR_BS_ROFORMER_REDISTRIBUTION_CONFIRMED == 'true' }}
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}

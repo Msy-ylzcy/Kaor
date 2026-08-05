@@ -6,15 +6,13 @@ Kaor 是一个本地优先的视频字幕提取、校对、AI 融合、翻译和
 
 当前源码版本已经支持字幕、音频、混合三种识别模式。除 AI 融合与 AI 翻译外，视频解码、OCR、UVR5 人声分离、ASR、时间边界精修、说话人聚类、CSV、ASS 和视频渲染均在本机执行。
 
-Windows x64 提供 CPU、AMD 和 NVIDIA CUDA 12.6 三种完整的解压即用包。三个包都自带 Python 运行时、WebUI、FFmpeg、PaddleOCR、PyTorch 音频栈、OCR 模型、BS-Roformer、字体和音频 Worker。普通用户只需完整解压并双击 `Kaor.exe`，不需要安装 Python、运行 `pip`、创建虚拟环境，也不需要安装 CUDA Toolkit、Node.js 或 UVR5。
-
-> **当前发行状态（2026-08-05）：** 源码仓库已经公开，便携包也已完成本地构建和验收，但尚未作为公开 GitHub Release 发布。原因是包内 BS-Roformer checkpoint 的上游页面没有给出可确认的再分发许可。取得并留存明确授权或换用许可清晰的模型后，发行工作流才会发布三套二进制资产；在此之前不要把 GitHub 自动生成的 Source code ZIP 当成免环境版。
+Windows x64 提供 CPU、AMD 和 NVIDIA CUDA 12.6 三种完整的解压即用包。三个包都自带 Python 运行时、WebUI、FFmpeg、PaddleOCR、PyTorch 音频栈、OCR 模型、字体和音频 Worker。普通用户只需完整解压并双击 `Kaor.exe`，不需要安装 Python、运行 `pip`、创建虚拟环境，也不需要安装 CUDA Toolkit、Node.js 或 UVR5。首次运行 UVR5 人声分离时，Kaor 会从模型原发布页断点下载约 610 MiB 的 BS-Roformer checkpoint，校验固定大小和 SHA-256 后保存到程序目录；发行包本身不重新分发该权重。
 
 ![Kaor 本地字幕工作台](docs/images/kaor-workbench.png)
 
 ## 下载与启动
 
-1. CPU/AMD 用户在 GitHub Releases 下载对应 ZIP 并完整解压到普通可写目录。
+1. CPU/AMD 用户在 [GitHub Releases](https://github.com/Msy-ylzcy/Kaor/releases/latest) 下载对应 ZIP 并完整解压到普通可写目录。
 2. NVIDIA 用户把 `Kaor-Windows-x64-NVIDIA-Setup.exe`、`Kaor-Windows-x64-NVIDIA.parts.json` 和从 `.zip.001` 开始的全部分片下载到同一目录，再双击 Setup；它会逐片及整包校验后本地解压。
 3. 双击解压目录中的 `Kaor.exe`，浏览器会打开本地 WebUI；手动访问地址默认为 `http://127.0.0.1:8765/`。
 
@@ -79,14 +77,14 @@ speech.csv
 source.csv
 ```
 
-解压版只从程序目录读取随包提供的模型：
+解压版只从程序目录读取由 Kaor 管理的 UVR5 资源：
 
 ```text
 models\uvr\model_bs_roformer_ep_317_sdr_12.9755.ckpt
 models\uvr\model_bs_roformer_ep_317_sdr_12.9755.yaml
 ```
 
-checkpoint 固定为 `639331213` 字节，启动和发行构建都会核对其 SHA-256。Kaor 使用 `audio-separator` 的 BS-Roformer 推理核心，不启动 UVR 图形界面，也不读取用户机器上的 UVR5 安装目录。
+YAML 随包提供并由发行构建核对 SHA-256；checkpoint 首次运行 UVR5 时下载，固定为 `639331213` 字节并在启用前核对 SHA-256。Kaor 使用 `audio-separator` 的 BS-Roformer 推理核心，不启动 UVR 图形界面，也不读取用户机器上的 UVR5 安装目录。
 
 ### 混合模式
 
@@ -171,7 +169,8 @@ $env:KAOR_NO_BROWSER = "1"
 
 | 操作 | 是否可能联网 | 发送内容 |
 | --- | --- | --- |
-| 视频导入、OCR、UVR5、ASR、校对、ASS、渲染 | 否 | 无 |
+| 视频导入、OCR、已安装模型后的 UVR5/ASR、校对、ASS、渲染 | 否 | 无 |
+| 首次运行 UVR5 且 checkpoint 尚未下载 | 是 | 从固定 GitHub Release 下载模型文件，不发送视频或音频 |
 | 首次下载缺失的 ASR 模型 | 是 | 模型仓库下载请求 |
 | 首次下载缺失的 NeMo 说话人模型 | 是 | NVIDIA NGC 模型下载请求 |
 | 一键部署本地翻译模型 | 是 | llama.cpp 与所选 GGUF 下载请求 |
@@ -190,11 +189,11 @@ npm.cmd run build --prefix apps/web
 .\.venv-nvidia-cu126\Scripts\python.exe -m compileall -q backend kaor.py
 ```
 
-完整使用方法见 [中文使用手册](docs/USER_GUIDE.zh-CN.md)，从下载到成片的录制脚本见 [完整教程录制流程](docs/TUTORIAL_RECORDING.zh-CN.md)，错误处理见 [中文故障排查](docs/TROUBLESHOOTING.zh-CN.md)，模块与数据流见 [架构和运行原理](docs/ARCHITECTURE.zh-CN.md)，发行构建见 [Windows 发行说明](docs/RELEASE_BUILD.zh-CN.md)。
+版本变化见 [Changelog](CHANGELOG.md)，完整使用方法见 [中文使用手册](docs/USER_GUIDE.zh-CN.md)，从下载到成片的录制脚本见 [完整教程录制流程](docs/TUTORIAL_RECORDING.zh-CN.md)，错误处理见 [中文故障排查](docs/TROUBLESHOOTING.zh-CN.md)，模块与数据流见 [架构和运行原理](docs/ARCHITECTURE.zh-CN.md)，发行构建见 [Windows 发行说明](docs/RELEASE_BUILD.zh-CN.md)。
 
 ## 发行完整性
 
-每套 Release 同时提供校验文件和发行清单。包内 `SHA256SUMS.txt` 覆盖全部文件，`RELEASE.json` 记录实际运行档位，`AUDIO-RUNTIME-PROBE.json` 记录打包后音频 Worker 的模块探测。NVIDIA 版的 `parts.json` 额外记录每片与完整 ZIP 的大小和 SHA-256，随包 Setup 会在解压前实际重建并复核整包。运行程序所需的解释器、库、二进制和固定 BS-Roformer 均随发行资产交付；语言专用 ASR 和可选本地翻译 GGUF 由界面按需下载，下载后仍不需要额外安装环境。
+每套 Release 同时提供校验文件和发行清单。包内 `SHA256SUMS.txt` 覆盖全部文件，`RELEASE.json` 记录实际运行档位，`AUDIO-RUNTIME-PROBE.json` 记录打包后音频 Worker 的模块探测。NVIDIA 版的 `parts.json` 额外记录每片与完整 ZIP 的大小和 SHA-256，随包 Setup 会在解压前实际重建并复核整包。运行程序所需的解释器、库和二进制均随发行资产交付；BS-Roformer checkpoint、语言专用 ASR 和可选本地翻译 GGUF 由程序按需下载并管理，下载后仍不需要额外安装环境。
 
 ## 许可证
 

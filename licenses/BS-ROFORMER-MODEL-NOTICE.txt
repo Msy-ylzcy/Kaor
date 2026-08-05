@@ -1,13 +1,13 @@
 BS-Roformer model artifact notice
 ================================
 
-Bundled filename:
+Managed-download filename:
   model_bs_roformer_ep_317_sdr_12.9755.ckpt
 
 Model author attribution used by the upstream catalog:
   viperx
 
-Upstream distribution location used by the release workflow:
+Upstream distribution location used by Kaor's first-use downloader:
   https://github.com/TRvlvr/model_repo/releases/download/all_public_uvr_models/model_bs_roformer_ep_317_sdr_12.9755.ckpt
 
 Configuration source:
@@ -40,9 +40,11 @@ must not be applied to the separately distributed checkpoint merely because the
 checkpoint uses that YAML.
 
 The Kaor MIT License covers Kaor source code and does not relicense this model
-artifact. A public Kaor binary archive containing the checkpoint requires an
-explicit redistribution grant from the model rightsholder/distributor, or a
-replacement model whose published terms permit the intended redistribution.
-Release maintainers must retain that grant and update this notice before public
-publication. This notice records provenance and the unresolved license status;
-it is not a license grant.
+artifact. Kaor's public portable archives do not contain the checkpoint. When
+the user first starts the UVR stage, Kaor downloads the file directly from the
+upstream location above, verifies the recorded size and SHA-256, and stores it
+in the user's extracted Kaor directory. Any future release that embeds the
+checkpoint would require an explicit redistribution grant from the model
+rightsholder/distributor, or a replacement model whose published terms permit
+the intended redistribution. This notice records provenance and the unresolved
+license status; it is not a license grant.
