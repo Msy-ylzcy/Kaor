@@ -1,0 +1,17 @@
+# Pinned direct dependencies shared by all Windows x64 portable profiles.
+# Torch, TorchAudio, and TorchVision are installed separately by scripts/build-portable.ps1:
+# CPU/AMD use the Tsinghua mirror; NVIDIA uses PyTorch's official CUDA index.
+audio-separator==0.44.5
+fastapi==0.116.1
+funasr==1.4.0
+huggingface_hub==0.36.2
+httpx==0.28.1
+keyring==25.6.0
+nemo_toolkit[asr]==2.7.3
+numpy==2.2.6
+onnxruntime==1.28.0
+opencv-contrib-python==4.10.0.84
+paddleocr==3.7.0
+paddlex==3.7.2
+pydantic==2.11.7
+uvicorn==0.35.0

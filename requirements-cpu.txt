@@ -1,0 +1,4 @@
+# Windows x64 CPU portable profile. Includes the complete local audio stack;
+# the selected ASR model remains an on-demand download.
+-r requirements-runtime-common.txt
+paddlepaddle==3.3.1

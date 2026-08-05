@@ -1,0 +1,114 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-ci.txt
+
+      - name: Install backend dependencies
+        run: python -m pip install -r requirements-ci.txt pytest==8.4.1
+
+      - name: Compile Python sources
+        run: python -m compileall -q backend kaor.py
+
+      - name: Run backend tests
+        run: python -m pytest tests/backend -q
+
+  frontend:
+    name: Frontend
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+
+      - name: Install frontend dependencies
+        run: npm ci --prefix apps/web
+
+      - name: Build frontend
+        run: npm run build --prefix apps/web
+
+  release-script:
+    name: Validate release scripts
+    runs-on: windows-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Parse PowerShell
+        shell: pwsh
+        run: |
+          foreach ($path in @(
+            "scripts/build-portable.ps1",
+            "scripts/split-portable-archive.ps1",
+            "scripts/test-portable-split.ps1"
+          )) {
+            $tokens = $null
+            $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile(
+              (Resolve-Path $path),
+              [ref]$tokens,
+              [ref]$errors
+            ) | Out-Null
+            if ($errors.Count -gt 0) {
+              $errors | ForEach-Object { Write-Error "$path`: $($_.Message)" }
+              exit 1
+            }
+          }
+
+      - name: Validate profile requirements
+        shell: pwsh
+        run: |
+          foreach ($profile in @("cpu", "amd", "nvidia-cu126")) {
+            $path = "requirements-$profile.txt"
+            if (-not (Test-Path $path)) {
+              throw "Missing $path"
+            }
+          }
+
+      - name: Compile packaging entry points
+        run: |
+          python -m py_compile scripts/kaor_frozen_entry.py scripts/audit-portable-size.py
+          python -c "compile(open('Kaor.spec', encoding='utf-8').read(), 'Kaor.spec', 'exec')"
+
+      - name: Run split release roundtrip
+        shell: pwsh
+        run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/test-portable-split.ps1

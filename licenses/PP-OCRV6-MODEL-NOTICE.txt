@@ -1,0 +1,43 @@
+PP-OCRv6 bundled model notice
+=============================
+
+Kaor portable releases include the official PaddlePaddle PP-OCRv6 medium
+detection and recognition inference files listed below. The model cards at
+both pinned revisions identify the models as Apache License 2.0. The complete
+license text is retained as licenses/APACHE-2.0.txt, and each model's original
+README.md is distributed beside its runtime files.
+
+Detection model
+---------------
+
+Repository: https://huggingface.co/PaddlePaddle/PP-OCRv6_medium_det
+Revision: e42c8690e385ae9639912cad7b65e1de8075314d
+Resolved source prefix:
+https://huggingface.co/PaddlePaddle/PP-OCRv6_medium_det/resolve/e42c8690e385ae9639912cad7b65e1de8075314d/
+
+File                  Size (bytes)  SHA-256
+configuration.json             71  2e1c5a9e1cdae7ee2a28ac27d4e25172029cfa661cbeb4418f6be9998ef02f79
+inference.json             312150  0f1a7ec35da36173529c7a60238b7f7919e3831929c3f700ad90ad4896adecd5
+inference.pdiparams      61960476  85218d2e3d98f5a21c58b4220627be923a97aee5db3cc71f39536ab31ac53960
+inference.yml                886  7298d5ead546584af2504d03355f881ac7a7bc0eb1e282d3e159277c1d0af871
+README.md                  23247  59f37b08a9a49aa6c1275e7b0363991353582f4dc7676539a5d2b05aab57e744
+
+Recognition model
+-----------------
+
+Repository: https://huggingface.co/PaddlePaddle/PP-OCRv6_medium_rec
+Revision: e5a92bcbc5cc1b494628e458d267778f0704fd7c
+Resolved source prefix:
+https://huggingface.co/PaddlePaddle/PP-OCRv6_medium_rec/resolve/e5a92bcbc5cc1b494628e458d267778f0704fd7c/
+
+File                  Size (bytes)  SHA-256
+inference.json             221814  0b2e25e990bd072f1bf77d59d67d508bce6c4bd44af6624e0fb27d6da2cd00e8
+inference.pdiparams      76465087  1b01c79a914587933f615569e75de54f2e638ebb5d3f3b3c1b38c24ede8c7319
+inference.yml             150580  991b700facf5b50a7de193468207d5f4255b538dde0d312ae3b7c7a9b6873129
+README.md                  23474  75ff9c4853ed171f36224127805062f9bcd1cfbbcacae3d577344866df74f6d3
+
+The release workflow downloads only these runtime files and model cards from
+the immutable revisions above, then rejects any file whose byte length or
+SHA-256 differs from this manifest. Kaor's MIT License does not relicense the
+model files. PaddlePaddle and PaddleOCR names and trademarks remain the
+property of their respective owners.

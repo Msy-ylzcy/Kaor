@@ -1,0 +1,17 @@
+Kaor Windows portable runtime: FFmpeg source information
+
+Binary path: bin/ffmpeg.exe
+Binary version: FFmpeg 7.1 essentials_build-www.gyan.dev
+Binary SHA-256: 2ce797a0f88d7f067180338fb227f7b1928ea727bd9a4d7a1d022f7c52af71a3
+Acquired from: imageio-ffmpeg 0.6.0 Windows x64 wheel
+Wheel project: https://github.com/imageio/imageio-ffmpeg
+Build provider: https://www.gyan.dev/ffmpeg/builds/
+FFmpeg source: https://ffmpeg.org/releases/ffmpeg-7.1.tar.xz
+FFmpeg source repository: https://git.ffmpeg.org/ffmpeg.git
+
+The executable reports --enable-gpl and --enable-version3. It remains licensed
+separately from Kaor under the applicable GNU GPL version 3 terms. The build also
+contains external libraries whose source locations and licenses are listed by the
+build provider and in the FFmpeg build configuration printed by:
+
+    bin\ffmpeg.exe -version

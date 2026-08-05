@@ -1,0 +1,458 @@
+name: Portable Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version without the leading v
+        required: true
+        default: 0.2.0
+      prerelease:
+        description: Publish as a prerelease
+        required: true
+        type: boolean
+        default: true
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  binary-license-gate:
+    name: Verify portable model redistribution grant
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require the BS-Roformer redistribution confirmation
+        shell: bash
+        env:
+          REDISTRIBUTION_CONFIRMED: ${{ vars.KAOR_BS_ROFORMER_REDISTRIBUTION_CONFIRMED }}
+        run: |
+          if [[ "$REDISTRIBUTION_CONFIRMED" != "true" ]]; then
+            echo "Set KAOR_BS_ROFORMER_REDISTRIBUTION_CONFIRMED=true only after retaining an explicit redistribution grant. Source tags and repository publication remain independent of this portable-binary workflow." >&2
+            exit 1
+          fi
+
+  portable:
+    name: Build ${{ matrix.profile }}
+    needs: binary-license-gate
+    runs-on: windows-latest
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix:
+        profile: [cpu, amd, nvidia-cu126]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            requirements-runtime-common.txt
+            requirements-${{ matrix.profile }}.txt
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+
+      - name: Resolve release version
+        id: version
+        shell: pwsh
+        run: |
+          $version = if ($env:GITHUB_REF_TYPE -eq "tag") {
+            $env:GITHUB_REF_NAME.TrimStart("v")
+          } else {
+            "${{ inputs.version }}"
+          }
+          if ($version -notmatch '^\d+\.\d+\.\d+([-.][0-9A-Za-z.-]+)?$') {
+            throw "Invalid release version: $version"
+          }
+          "version=$version" >> $env:GITHUB_OUTPUT
+
+      - name: Download and verify the bundled BS-Roformer assets
+        shell: pwsh
+        run: |
+          $root = Join-Path $env:RUNNER_TEMP "kaor-uvr"
+          $modelDir = Join-Path $root "models\MDX_Net_Models"
+          $configDir = Join-Path $modelDir "model_data\mdx_c_configs"
+          New-Item -ItemType Directory -Path $configDir -Force | Out-Null
+          $model = Join-Path $modelDir "model_bs_roformer_ep_317_sdr_12.9755.ckpt"
+          $config = Join-Path $configDir "model_bs_roformer_ep_317_sdr_12.9755.yaml"
+          Invoke-WebRequest `
+            -Uri "https://github.com/TRvlvr/model_repo/releases/download/all_public_uvr_models/model_bs_roformer_ep_317_sdr_12.9755.ckpt" `
+            -OutFile $model
+          Invoke-WebRequest `
+            -Uri "https://raw.githubusercontent.com/ZFTurbo/Music-Source-Separation-Training/main/configs/viperx/model_bs_roformer_ep_317_sdr_12.9755.yaml" `
+            -OutFile $config
+          if ((Get-Item $model).Length -ne 639331213) {
+            throw "Unexpected BS-Roformer checkpoint size"
+          }
+          if ((Get-FileHash $model -Algorithm SHA256).Hash -ne "5B84F37E8D444C8CB30C79D77F613A41C05868FF9C9AC6C7049C00AEFAE115AA") {
+            throw "BS-Roformer checkpoint SHA-256 mismatch"
+          }
+          if ((Get-FileHash $config -Algorithm SHA256).Hash -ne "2BFDD16C656BD9519ABA757CC4F8834B7EDE675EB1E00EC4772D74AE1C41AF7F") {
+            throw "BS-Roformer config SHA-256 mismatch"
+          }
+          "KAOR_RELEASE_UVR_ROOT=$root" >> $env:GITHUB_ENV
+
+      - name: Download and verify the bundled PP-OCRv6 assets
+        shell: pwsh
+        run: |
+          $modelRoot = Join-Path $PWD "models\paddlex\official_models"
+          $manifestPath = Join-Path $PWD "licenses\PP-OCRV6-MODEL-MANIFEST.json"
+          $manifest = Get-Content -LiteralPath $manifestPath -Raw -Encoding utf8 | ConvertFrom-Json
+          if ([int]$manifest.schema_version -ne 1 -or @($manifest.models).Count -ne 2) {
+            throw "Unsupported or incomplete PP-OCRv6 model manifest"
+          }
+
+          foreach ($model in @($manifest.models)) {
+            $modelDirectory = Join-Path $modelRoot $model.directory
+            New-Item -ItemType Directory -Path $modelDirectory -Force | Out-Null
+            foreach ($file in $model.files) {
+              $target = Join-Path $modelDirectory $file.name
+              $url = "https://huggingface.co/$($model.repository)/resolve/$($model.revision)/$($file.name)?download=true"
+              Invoke-WebRequest `
+                -Uri $url `
+                -OutFile $target `
+                -MaximumRetryCount 3 `
+                -RetryIntervalSec 5
+              $download = Get-Item -LiteralPath $target
+              if ($download.Length -ne [long]$file.size) {
+                throw "Unexpected $($model.directory)/$($file.name) size: $($download.Length)"
+              }
+              $actualHash = (Get-FileHash -LiteralPath $target -Algorithm SHA256).Hash.ToLowerInvariant()
+              if ($actualHash -ne $file.sha256) {
+                throw "SHA-256 mismatch for $($model.directory)/$($file.name)"
+              }
+            }
+          }
+
+      - name: Build and validate portable archive
+        shell: pwsh
+        run: |
+          .\scripts\build-portable.ps1 `
+            -RuntimeProfile "${{ matrix.profile }}" `
+            -Version "${{ steps.version.outputs.version }}" `
+            -Python "python" `
+            -UvrRoot "$env:KAOR_RELEASE_UVR_ROOT"
+
+      - name: Remove unpacked build intermediates
+        if: always()
+        shell: pwsh
+        run: |
+          Remove-Item -LiteralPath ".build" -Recurse -Force -ErrorAction SilentlyContinue
+          Get-ChildItem "artifacts\releases" -Directory -ErrorAction SilentlyContinue |
+            Remove-Item -Recurse -Force
+
+      - name: Verify profile release candidate allowlist
+        shell: pwsh
+        run: |
+          $root = Resolve-Path "artifacts\releases"
+          $profile = "${{ matrix.profile }}"
+          $version = "${{ steps.version.outputs.version }}"
+          $expectedNames = [System.Collections.Generic.List[string]]::new()
+          if ($profile -eq "cpu" -or $profile -eq "amd") {
+            $label = $profile.ToUpperInvariant()
+            $archiveName = "Kaor-Windows-x64-$label.zip"
+            $expectedNames.Add($archiveName)
+            $expectedNames.Add("$archiveName.sha256")
+            $expectedNames.Add("$archiveName.release.json")
+            $summary = Get-Content -LiteralPath (Join-Path $root "$archiveName.release.json") -Raw | ConvertFrom-Json
+            if ($summary.asset -ne $archiveName -or
+                $summary.version -ne $version -or
+                $summary.runtime_profile -ne $profile) {
+              throw "Invalid $profile release summary metadata"
+            }
+          } elseif ($profile -eq "nvidia-cu126") {
+            $manifestName = "Kaor-Windows-x64-NVIDIA.parts.json"
+            $checksumName = "Kaor-Windows-x64-NVIDIA.parts.sha256"
+            $setupName = "Kaor-Windows-x64-NVIDIA-Setup.exe"
+            $setupSourceName = "Kaor-Windows-x64-NVIDIA-Setup.cs"
+            $manifest = Get-Content -LiteralPath (Join-Path $root $manifestName) -Raw -Encoding utf8 | ConvertFrom-Json
+            if ($manifest.version -ne $version -or
+                $manifest.runtime_profile -ne $profile -or
+                $manifest.archive_name -ne "Kaor-Windows-x64-NVIDIA.zip" -or
+                $manifest.package_directory -ne "Kaor-Windows-x64-NVIDIA" -or
+                $manifest.assembler.name -ne $setupName -or
+                $manifest.assembler_source.name -ne $setupSourceName) {
+              throw "Invalid NVIDIA release manifest metadata"
+            }
+            $parts = @($manifest.parts)
+            if ($parts.Count -lt 2) {
+              throw "NVIDIA release requires at least two archive parts"
+            }
+            for ($index = 0; $index -lt $parts.Count; $index++) {
+              $expectedPartName = "Kaor-Windows-x64-NVIDIA.zip.{0:D3}" -f ($index + 1)
+              if ($parts[$index].name -ne $expectedPartName) {
+                throw "Unexpected or non-contiguous NVIDIA release part: $($parts[$index].name); expected $expectedPartName"
+              }
+              $expectedNames.Add($expectedPartName)
+            }
+            foreach ($name in @($manifestName, $checksumName, $setupName, $setupSourceName)) {
+              $expectedNames.Add($name)
+            }
+          } else {
+            throw "Unsupported release profile: $profile"
+          }
+
+          $directories = @(Get-ChildItem -LiteralPath $root -Directory -Force)
+          $actualNames = @(Get-ChildItem -LiteralPath $root -File -Force | ForEach-Object { $_.Name })
+          $unexpected = @($actualNames | Where-Object { $_ -notin $expectedNames })
+          $missing = @($expectedNames | Where-Object { $_ -notin $actualNames })
+          if ($directories.Count -ne 0 -or
+              $unexpected.Count -ne 0 -or
+              $missing.Count -ne 0 -or
+              $actualNames.Count -ne $expectedNames.Count) {
+            throw "Profile asset allowlist mismatch; unexpected=[$($unexpected -join ', ')], missing=[$($missing -join ', ')]"
+          }
+
+      - name: Upload release candidate
+        uses: actions/upload-artifact@v4
+        with:
+          name: kaor-${{ matrix.profile }}
+          path: artifacts/releases/*
+          if-no-files-found: error
+          compression-level: 0
+
+  publish:
+    name: Publish GitHub Release
+    needs: portable
+    runs-on: windows-latest
+    timeout-minutes: 60
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: kaor-*
+          path: release-assets
+          merge-multiple: true
+
+      - name: Verify release assets
+        shell: pwsh
+        run: |
+          $expectedVersion = if ($env:GITHUB_REF_TYPE -eq "tag") {
+            $env:GITHUB_REF_NAME.TrimStart("v")
+          } else {
+            "${{ inputs.version }}"
+          }
+          $expectedAssetNames = [System.Collections.Generic.List[string]]::new()
+          $archives = @(Get-ChildItem release-assets -Filter "*.zip" -File)
+          $expectedArchives = @(
+            @{ name = "Kaor-Windows-x64-CPU.zip"; profile = "cpu" },
+            @{ name = "Kaor-Windows-x64-AMD.zip"; profile = "amd" }
+          )
+          if ($archives.Count -ne $expectedArchives.Count) {
+            throw "Expected two single-ZIP releases, found $($archives.Count)"
+          }
+          foreach ($expectedArchive in $expectedArchives) {
+            $archive = Get-Item (Join-Path "release-assets" $expectedArchive.name) -ErrorAction Stop
+            if ($archive.Length -gt 2GB) {
+              throw "$($archive.Name) exceeds GitHub's 2 GiB release-asset limit"
+            }
+            $checksumFile = "$($archive.FullName).sha256"
+            if (-not (Test-Path -LiteralPath $checksumFile)) {
+              throw "Missing checksum for $($archive.Name)"
+            }
+            $expected = ((Get-Content -LiteralPath $checksumFile -Raw).Trim() -split '\s+')[0]
+            $actual = (Get-FileHash -LiteralPath $archive.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+            if ($expected -ne $actual) {
+              throw "Checksum mismatch for $($archive.Name)"
+            }
+            $summaryPath = "$($archive.FullName).release.json"
+            $summary = Get-Content -LiteralPath $summaryPath -Raw | ConvertFrom-Json
+            if ($summary.asset -ne $archive.Name -or
+                $summary.version -ne $expectedVersion -or
+                $summary.runtime_profile -ne $expectedArchive.profile -or
+                [long]$summary.size_bytes -ne $archive.Length -or
+                $summary.sha256 -ne $actual) {
+              throw "Release summary mismatch for $($archive.Name)"
+            }
+            $expectedAssetNames.Add($archive.Name)
+            $expectedAssetNames.Add([IO.Path]::GetFileName($checksumFile))
+            $expectedAssetNames.Add([IO.Path]::GetFileName($summaryPath))
+          }
+
+          $manifestName = "Kaor-Windows-x64-NVIDIA.parts.json"
+          $checksumName = "Kaor-Windows-x64-NVIDIA.parts.sha256"
+          $setupName = "Kaor-Windows-x64-NVIDIA-Setup.exe"
+          $setupSourceName = "Kaor-Windows-x64-NVIDIA-Setup.cs"
+          $manifestPath = (Get-Item (Join-Path "release-assets" $manifestName) -ErrorAction Stop).FullName
+          $expectedAssetNames.Add($manifestName)
+          $manifest = Get-Content -LiteralPath $manifestPath -Raw -Encoding utf8 | ConvertFrom-Json
+          if ($manifest.schema_version -ne 1 -or
+              $manifest.version -ne $expectedVersion -or
+              $manifest.runtime_profile -ne "nvidia-cu126" -or
+              $manifest.archive_name -ne "Kaor-Windows-x64-NVIDIA.zip" -or
+              $manifest.package_directory -ne "Kaor-Windows-x64-NVIDIA" -or
+              [long]$manifest.part_size_bytes -ne 1900MB -or
+              $manifest.assembler.name -ne $setupName -or
+              $manifest.assembler_source.name -ne $setupSourceName) {
+            throw "Invalid NVIDIA split manifest metadata"
+          }
+
+          $parts = @($manifest.parts)
+          if ($parts.Count -lt 2) {
+            throw "NVIDIA split manifest must contain at least two parts"
+          }
+          [long]$partTotal = 0
+          for ($partIndex = 0; $partIndex -lt $parts.Count; $partIndex++) {
+            $partRecord = $parts[$partIndex]
+            $expectedPartName = "Kaor-Windows-x64-NVIDIA.zip.{0:D3}" -f ($partIndex + 1)
+            if ([IO.Path]::GetFileName($partRecord.name) -ne $partRecord.name -or
+                $partRecord.name -ne $expectedPartName) {
+              throw "Unexpected or non-contiguous NVIDIA release part: $($partRecord.name); expected $expectedPartName"
+            }
+            $partPath = Join-Path "release-assets" $partRecord.name
+            $part = Get-Item -LiteralPath $partPath -ErrorAction Stop
+            if ($part.Length -ge 2GB -or $part.Length -gt 1900MB -or
+                $part.Length -ne [long]$partRecord.size_bytes) {
+              throw "Invalid release part size: $($part.Name)"
+            }
+            $actual = (Get-FileHash -LiteralPath $partPath -Algorithm SHA256).Hash.ToLowerInvariant()
+            if ($actual -ne $partRecord.sha256) {
+              throw "Checksum mismatch for $($part.Name)"
+            }
+            $expectedAssetNames.Add($part.Name)
+            $partTotal += $part.Length
+          }
+          if ($partTotal -ne [long]$manifest.archive_size_bytes) {
+            throw "NVIDIA parts do not add up to the complete archive size"
+          }
+
+          foreach ($fileRecord in @($manifest.assembler, $manifest.assembler_source)) {
+            $path = Join-Path "release-assets" $fileRecord.name
+            $file = Get-Item -LiteralPath $path -ErrorAction Stop
+            $actual = (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLowerInvariant()
+            if ($file.Length -ne [long]$fileRecord.size_bytes -or $actual -ne $fileRecord.sha256) {
+              throw "Release helper mismatch: $($file.Name)"
+            }
+            $expectedAssetNames.Add($file.Name)
+          }
+
+          $checksumFile = Get-Item (Join-Path "release-assets" $checksumName) -ErrorAction Stop
+          $expectedAssetNames.Add($checksumName)
+          $checksumEntries = @{}
+          foreach ($line in Get-Content -LiteralPath $checksumFile.FullName) {
+            if ($line -notmatch '^([0-9a-f]{64}) \*(.+)$') {
+              throw "Malformed checksum line: $line"
+            }
+            if ($checksumEntries.ContainsKey($Matches[2])) {
+              throw "Duplicate checksum entry: $($Matches[2])"
+            }
+            $checksumEntries[$Matches[2]] = $Matches[1]
+          }
+          $expectedChecksumNames = @($manifest.archive_name) +
+            @($manifest.parts | ForEach-Object { $_.name }) +
+            @($setupName, $setupSourceName, $manifestName)
+          if ($checksumEntries.Count -ne $expectedChecksumNames.Count) {
+            throw "NVIDIA checksum manifest contains an unexpected number of entries"
+          }
+          foreach ($name in $expectedChecksumNames) {
+            if (-not $checksumEntries.ContainsKey($name)) {
+              throw "Missing NVIDIA checksum entry: $name"
+            }
+          }
+          if ($checksumEntries[$manifest.archive_name] -ne $manifest.archive_sha256) {
+            throw "Complete NVIDIA archive hash differs between manifests"
+          }
+          foreach ($name in $expectedChecksumNames | Where-Object { $_ -ne $manifest.archive_name }) {
+            $actual = (Get-FileHash -LiteralPath (Join-Path "release-assets" $name) -Algorithm SHA256).Hash.ToLowerInvariant()
+            if ($checksumEntries[$name] -ne $actual) {
+              throw "Checksum manifest mismatch for $name"
+            }
+          }
+
+          $setupPath = (Resolve-Path (Join-Path "release-assets" $setupName)).Path
+          $setupArguments = @('"--verify-only"', ('"' + $manifestPath + '"'))
+          $process = Start-Process -FilePath $setupPath -ArgumentList $setupArguments -Wait -PassThru
+          if ($process.ExitCode -ne 0) {
+            $errorLog = Join-Path "release-assets" (([IO.Path]::GetFileNameWithoutExtension($setupPath)) + ".error.log")
+            $details = if (Test-Path -LiteralPath $errorLog) {
+              Get-Content -LiteralPath $errorLog -Raw -Encoding utf8
+            } else {
+              "No Setup error log was written."
+            }
+            throw "NVIDIA Setup verification failed: $details"
+          }
+
+          $releaseDirectories = @(Get-ChildItem release-assets -Directory -Force)
+          if ($releaseDirectories.Count -ne 0) {
+            throw "Release candidate contains unexpected directories: $($releaseDirectories.Name -join ', ')"
+          }
+          $actualAssetNames = @(Get-ChildItem release-assets -File -Force | ForEach-Object { $_.Name })
+          $unexpectedAssets = @($actualAssetNames | Where-Object { $_ -notin $expectedAssetNames })
+          $missingAssets = @($expectedAssetNames | Where-Object { $_ -notin $actualAssetNames })
+          if ($unexpectedAssets.Count -ne 0 -or
+              $missingAssets.Count -ne 0 -or
+              $actualAssetNames.Count -ne $expectedAssetNames.Count) {
+            throw "Release asset allowlist mismatch; unexpected=[$($unexpectedAssets -join ', ')], missing=[$($missingAssets -join ', ')]"
+          }
+
+      - name: Publish release
+        if: ${{ vars.KAOR_BS_ROFORMER_REDISTRIBUTION_CONFIRMED == 'true' }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          INPUT_VERSION: ${{ inputs.version }}
+          INPUT_PRERELEASE: ${{ inputs.prerelease }}
+        run: |
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            tag="${GITHUB_REF_NAME}"
+          else
+            tag="v${INPUT_VERSION}"
+          fi
+          prerelease=""
+          if [[ "${GITHUB_REF_TYPE}" != "tag" && "${INPUT_PRERELEASE}" == "true" ]]; then
+            prerelease="--prerelease"
+          fi
+          if gh release view "$tag" >/dev/null 2>&1; then
+            immutable="$(gh release view "$tag" --json isImmutable --jq '.isImmutable')"
+            if [[ "$immutable" == "true" ]]; then
+              echo "Release $tag is immutable; publish a new version instead." >&2
+              exit 1
+            fi
+            gh release edit "$tag" --draft
+          else
+            gh release create "$tag" --title "Kaor $tag" --generate-notes $prerelease --draft
+          fi
+
+          gh release upload "$tag" release-assets/* --clobber
+
+          declare -A expected_assets=()
+          for path in release-assets/*; do
+            [[ -f "$path" ]] || continue
+            expected_assets["$(basename "$path")"]=1
+          done
+          declare -A uploaded_assets=()
+          while IFS= read -r asset; do
+            if [[ -z "${expected_assets[$asset]+present}" ]]; then
+              gh release delete-asset "$tag" "$asset" --yes
+            else
+              uploaded_assets["$asset"]=1
+            fi
+          done < <(gh release view "$tag" --json assets --jq '.assets[].name')
+          for asset in "${!expected_assets[@]}"; do
+            if [[ -z "${uploaded_assets[$asset]+present}" ]]; then
+              echo "Uploaded release asset is missing: $asset" >&2
+              exit 1
+            fi
+          done
+
+          if [[ "${GITHUB_REF_TYPE}" != "tag" && "${INPUT_PRERELEASE}" == "true" ]]; then
+            gh release edit "$tag" --draft=false --prerelease
+          else
+            gh release edit "$tag" --draft=false --prerelease=false
+          fi

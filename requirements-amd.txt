@@ -1,0 +1,5 @@
+# Windows x64 AMD portable profile.
+# PaddleOCR and the PyTorch audio pipeline use CPU kernels on Windows. Managed
+# local translation uses the bundled/downloaded Vulkan runtime on the AMD GPU.
+-r requirements-runtime-common.txt
+paddlepaddle==3.3.1

@@ -1,0 +1,12 @@
+Noto Sans SC runtime font
+
+Upstream package: @fontsource-variable/noto-sans-sc 5.3.0
+Registry: https://www.npmjs.com/package/@fontsource-variable/noto-sans-sc
+Package integrity: sha512-lNar1dF7Ik/lH...K0jDuLSU4vJ1w==
+License: SIL Open Font License 1.1 (see LICENSE)
+
+The upstream variable WOFF2 unicode-range subsets were converted locally to static
+400-weight TrueType subsets with FontTools 4.59.1, then merged into
+NotoSansSC-Regular.ttf. Variable and layout tables that FontTools cannot merge across
+unicode-range subsets were removed. The resulting font retains the glyph coverage
+needed by Kaor's libass subtitle renderer.

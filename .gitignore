@@ -1,0 +1,61 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyd
+*.so
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+*.nbc
+*.nbi
+numba/
+.venv/
+.venv-*/
+venv/
+
+# Node / Vite
+apps/web/node_modules/
+apps/web/dist/
+apps/web/.npm-cache/
+apps/web/*.tsbuildinfo
+apps/web/vite.config.js
+apps/web/vite.config.d.ts
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Local runtime data and downloaded assets
+.cache/
+.codex/
+.agents/
+data/
+models/
+bin/*.exe
+bin/*.dll
+artifacts/
+
+# Build output
+build/
+dist/
+.build/
+*.zip
+*.sha256
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+
+# Editors and operating systems
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+Desktop.ini

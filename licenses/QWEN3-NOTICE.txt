@@ -1,0 +1,24 @@
+Qwen3 GGUF model notice
+=======================
+
+Kaor's one-click local-model catalog downloads GGUF files from official Qwen
+repositories at fixed revisions. The official repositories identify these
+models as Apache License 2.0 and include an upstream LICENSE file:
+
+  https://huggingface.co/Qwen/Qwen3-1.7B-GGUF
+  https://huggingface.co/Qwen/Qwen3-4B-GGUF
+  https://huggingface.co/Qwen/Qwen3-8B-GGUF
+  https://huggingface.co/Qwen/Qwen3-14B-GGUF
+  https://huggingface.co/Qwen/Qwen3-32B-GGUF
+
+Kaor does not include these GGUF weights in its base portable archives. When a
+user starts one-click deployment, Kaor downloads the selected model and the
+LICENSE file from the same pinned repository revision. The license is stored as
+models/licenses/<model-id>-LICENSE.txt under Kaor's local-model data directory,
+and the generated model manifest records its absolute path. The deployment is
+not complete if the license download fails.
+
+The downloaded upstream LICENSE is the authoritative license text for that
+specific model revision. Kaor's MIT License does not relicense Qwen3 weights.
+This notice is provenance information and is not a substitute for the upstream
+Apache-2.0 LICENSE saved with the model.
