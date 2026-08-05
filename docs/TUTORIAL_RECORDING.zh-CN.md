@@ -2,6 +2,8 @@
 
 本文是一份可直接照稿录制的桌面端视频教程脚本，覆盖从 GitHub Releases 下载、首次启动、三种识别模式、AI 融合与翻译、人工校对、排版烧录，到日志排障和工作区重置的完整工作流。
 
+> **录制状态（2026-08-05）：** 源码已经公开，三套便携包已完成本地验收，但含 BS-Roformer checkpoint 的二进制资产仍受再分发许可门禁约束。第 4.2 节是正式 Release 发布后的下载镜头脚本；只有在 Releases 页面真实出现文中列出的全部资产后再录这一节，不要用 Source code ZIP 代替免环境版做演示。
+
 教程以 Windows x64 发行包为准。普通观众不需要 Python、Node.js、FFmpeg、CUDA Toolkit、UVR5 或虚拟环境；源码构建不属于本期主流程。界面仅面向桌面端，不安排移动端演示。
 
 > 录制前基准：以当前仓库的 [README](../README.md)、[中文使用手册](USER_GUIDE.zh-CN.md) 和 [故障排查](TROUBLESHOOTING.zh-CN.md) 为功能依据。正式录制前用准备发布的 Release 再走一遍本文检查点，避免界面文字或资产名变化。

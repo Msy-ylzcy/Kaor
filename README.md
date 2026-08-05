@@ -1,10 +1,14 @@
 # Kaor
 
+[![CI](https://github.com/Msy-ylzcy/Kaor/actions/workflows/ci.yml/badge.svg)](https://github.com/Msy-ylzcy/Kaor/actions/workflows/ci.yml)
+
 Kaor 是一个本地优先的视频字幕提取、校对、AI 融合、翻译和烧录工作台。WebUI 默认运行在 `http://127.0.0.1:8765/`，面向桌面端使用。
 
 当前源码版本已经支持字幕、音频、混合三种识别模式。除 AI 融合与 AI 翻译外，视频解码、OCR、UVR5 人声分离、ASR、时间边界精修、说话人聚类、CSV、ASS 和视频渲染均在本机执行。
 
 Windows x64 提供 CPU、AMD 和 NVIDIA CUDA 12.6 三种完整的解压即用包。三个包都自带 Python 运行时、WebUI、FFmpeg、PaddleOCR、PyTorch 音频栈、OCR 模型、BS-Roformer、字体和音频 Worker。普通用户只需完整解压并双击 `Kaor.exe`，不需要安装 Python、运行 `pip`、创建虚拟环境，也不需要安装 CUDA Toolkit、Node.js 或 UVR5。
+
+> **当前发行状态（2026-08-05）：** 源码仓库已经公开，便携包也已完成本地构建和验收，但尚未作为公开 GitHub Release 发布。原因是包内 BS-Roformer checkpoint 的上游页面没有给出可确认的再分发许可。取得并留存明确授权或换用许可清晰的模型后，发行工作流才会发布三套二进制资产；在此之前不要把 GitHub 自动生成的 Source code ZIP 当成免环境版。
 
 ![Kaor 本地字幕工作台](docs/images/kaor-workbench.png)
 
